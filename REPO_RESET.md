@@ -1,6 +1,9 @@
 # Reinicio del repositorio — 2026-10-26
 
-Este repositorio reemplaza a `adrishg/vgci_mutants`, que quedó archivado en GitHub.
+Este repositorio reemplaza al anterior, que quedó archivado en GitHub.
+
+- **Este repo (código, activo):** `~/Repositories/vgci_mutants`
+- **El anterior (completo, congelado):** `~/Repositories/vgci_mutants_archive`
 
 ## Por qué
 
@@ -37,7 +40,8 @@ pipeline escriba donde corresponde desde la primera corrida.
 | Historia completa (34 commits, todo el código) | `~/Archive/vgci_mutants_history_2026-10-26.bundle` |
 | `.git` completo, incluidos los objetos LFS | `~/Archive/vgci_mutants_git_2026-10-26.tar.zst` |
 | Archivos sin commitear al momento del corte | `~/Archive/vgci_mutants_untracked_2026-10-26.tar.zst` |
-| Repositorio original | `adrishg/vgci_mutants` (archivado en GitHub) |
+| Copia local completa del anterior | `~/Repositories/vgci_mutants_archive` |
+| Repositorio original en GitHub | `adrishg/vgci_mutants_archive` (archivado) |
 
 Para restaurar la historia:
 
