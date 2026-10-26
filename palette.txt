@@ -1,0 +1,73 @@
+CHANNEL / MUTANT / SETTING COLOR PALETTE
+======================================
+
+Source of truth: shared/plotting.py
+This file is a reference copy of the shared palette.
+
+Convention: lighter colors = vanilla; darker colors = masked.
+Code suffixes: VAN = vanilla; HM = masked.
+Channel families: Cav1.2 = blue; Kv2.1 = green; Nav1.5 = purple.
+WT = wild type. Hex values are RGB colors for use in plotting/design tools.
+
+MAIN ENSEMBLES
+
+Channel   Sequence   Vanilla   Masked
+--------  --------   -------   -------
+Cav1.2    WT         #DCEBF8   #3978B5
+Cav1.2    G402S      #C8DAF6   #315FAF
+Cav1.2    G406R      #B8E2F0   #217D9A
+Cav1.2    G490R      #D2E4F4   #296A9C
+Kv2.1     WT         #DDEBDD   #789A80
+Kv2.1     L403A      #A9D9AE   #168A43
+Kv2.1     F412L      #9CCFC1   #006B57
+Nav1.5    WT         #EBDCF2   #855094
+Nav1.5    QQQ        #BFA4CC   #4E2B62
+
+NAV1.5 ADDITIONAL MASK SETTINGS
+
+Sequence   Setting                         Hex       Palette key
+--------   -----------------------------   -------   --------------------
+WT         Masked v2                       #6F3F83   WT_MASKED_V2
+WT         Masked v2, IFM excluded          #542D68   WT_MASKED_V2_NOIFM
+QQQ        Masked v2                       #3F214F   QQQ_MASKED_V2
+
+IFM excluded means excluded from the mask, not deleted from the sequence.
+QQQ_MASKED is an alias of QQQ_HM (#4E2B62), the original masked setting.
+M2_VAN (#EBC9E3) and M2_HM (#8F3F75) are reserved colors for a second
+mutant or alternative mask; no specific mutant is assigned to them here.
+
+ADDITIONAL KV2.1 PALETTE KEYS
+
+experimental   #222222
+shift_closer   #F48FB1
+shift_farther  #FF8A65
+
+These are auxiliary keys, not mutant/setting assignments. Experimental
+reference overlays also have PDB-specific colors and markers defined in
+RMSD_REFERENCE_STYLES and NAV15_EXPERIMENTAL_STYLES in shared/plotting.py.
+
+SHARED ACCENT COLORS
+
+RED        #E57373
+PINK       #F48FB1
+RASPBERRY  #F06292
+CORAL      #FF8A65
+ORANGE     #FFB74D
+PEACH      #FFCC99
+APRICOT    #FFD89A
+YELLOW     #FFE082
+LEMON      #FFF176
+CREAM      #FFF6B3
+
+PYTHON USAGE
+
+from shared.plotting import ensemble_protocol_palette, NAV15_PALETTE
+
+colors = ensemble_protocol_palette("kv21", "f412l")
+# {"Vanilla": "#9CCFC1", "Masked": "#006B57"}
+
+wt_masked_v2 = NAV15_PALETTE["WT_MASKED_V2"]
+# "#6F3F83"
+
+The MolProbity/clashscore analyses use these shared ensemble colors via
+colors(channel) in shared/molprobity_analysis.py.

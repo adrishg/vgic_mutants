@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------------------
+# Este repositorio contiene CÓDIGO, no datos.
+# Los datos viven en Hugging Face y en el almacenamiento del cluster.
+# Nada de Git LFS: si un archivo es lo bastante grande como para necesitarlo,
+# no va aquí.
+# ---------------------------------------------------------------------------
+
+# Datos generados por el pipeline
+*.csv
+*.csv.gz
+*.tsv
+!docs/*_REGISTRY.tsv
+*.npy
+*.npz
+*.h5ad
+*.bam
+*.vcf
+*.vcf.gz
+*.fasta
+*.fa
+*.a3m
+
+# Estructuras predichas (las de referencia en */experimental/ sí se versionan)
+*.cif
+!*/experimental/*.cif
+*.pdb
+!*/experimental/*.pdb
+
+# Figuras y salidas renderizadas
+*.png
+*.pdf
+*.tiff
+*.tif
+*.svg
+*.eps
+
+# Logs y resúmenes de corrida (son resultados, no configuración)
+*.log
+*run_summary.json
+*run_metadata.json
+*merge_summary.json
+*_recompute_summary.json
+
+# Notebooks: los outputs no se versionan (usar nbstripout)
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Scratch local
+tmp/
+scratch/
+
+# macOS / editores
+.DS_Store
+**/.DS_Store
+.vscode/
+.idea/
