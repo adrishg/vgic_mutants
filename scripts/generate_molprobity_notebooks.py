@@ -54,12 +54,10 @@ do not establish that any global clashscore change originates at introduced R406
 'kv21': """All six WT/L403A/F412L × vanilla/masked ensembles are compared. The conformational extension
 uses the exact structures and existing chain-resolved coordinates from
 `Kv21_L403A_conformational_validation.ipynb`. Established tetramer/interface/alignment QC is retained.""",
-'nav15': """Following `Nav15_main_and_supplemental_figures.ipynb`, the main comparison is **WT vanilla →
-QQQ vanilla → QQQ original masked**. All seven downloaded ensembles enter the audit, tables, and
-supplementary mask-design plot. WT original masked and masked-v2/no-IFM variants are controls.
-`no-IFM` means exclusion of the IFM region from the mask, not deletion of the native IFM sequence.
-Original and v2 masks are joined to their explicitly named manifests; a few filenames overlap
-between masks, so basename without ensemble identity is not a safe global key.""",
+'nav15': """The active analysis uses unchanged vanilla plus corrected masked v1 and corrected masked v2
+cohorts. Retired masked CSVs are excluded at the shared data-access boundary, and no corrected WT
+masked no-IFM replacement is currently staged; it is not used as a fallback. The corrected v1 and
+v2 cohorts remain distinct mask designs and are not pooled.""",
 }
 
 
@@ -128,7 +126,7 @@ display(contrasts[(contrasts.cohort=='repository_QC') & contrasts.metric.ne('cla
     ['A','B','metric','median_difference','seed_mean_difference','CI_low','CI_high','seed_rank_biserial','q_BH']].round(4))
 """)
     if channel=='nav15':
-        md('## Supplementary mask-design controls\nAll seven ensembles are retained here. Compare the original mask with v2 within sequence, and WT masked v2 with WT masked v2 no-IFM. These controls test sensitivity to mask design.')
+        md('## Supplementary mask-design controls\nMasked v1 and v2 remain separate current cohorts and are summarized independently.')
         code("mp.plot_nav_controls(cohorts, OUT)\nplt.show()")
     md('## Recycle, AF-model, seed, and rank sensitivity\nThe full snapshot trace includes final separately and all early-recycle tails. The final-only analysis does not substitute a last available snapshot for a missing final file. The adjusted regression controls AF-model and snapshot composition, with uncertainty clustered by seed; its observation-weighted estimand differs from the seed-balanced primary result.')
     code("""mp.stratification(cohorts, CHANNEL, OUT)

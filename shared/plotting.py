@@ -42,8 +42,6 @@ CAV12_PALETTE = {
     "G402S_HM": "#315FAF",
     "G406R_VAN": "#B8E2F0",
     "G406R_HM": "#217D9A",
-    "G490R_VAN": "#D2E4F4",
-    "G490R_HM": "#296A9C",
 }
 
 NAV15_PALETTE = {
@@ -75,7 +73,6 @@ CHANNEL_ENSEMBLE_PALETTES = {
     ("cav12", "wt"): {"Vanilla": CAV12_PALETTE["WT_VAN"], "Masked": CAV12_PALETTE["WT_HM"]},
     ("cav12", "g402s"): {"Vanilla": CAV12_PALETTE["G402S_VAN"], "Masked": CAV12_PALETTE["G402S_HM"]},
     ("cav12", "g406r"): {"Vanilla": CAV12_PALETTE["G406R_VAN"], "Masked": CAV12_PALETTE["G406R_HM"]},
-    ("cav12", "g490r"): {"Vanilla": CAV12_PALETTE["G490R_VAN"], "Masked": CAV12_PALETTE["G490R_HM"]},
     ("kv21", "wt"): {"Vanilla": KV21_PALETTE["WT_VAN"], "Masked": KV21_PALETTE["WT_HM"]},
     ("kv21", "l403a"): {"Vanilla": KV21_PALETTE["L403A_VAN"], "Masked": KV21_PALETTE["L403A_HM"]},
     ("kv21", "f412l"): {"Vanilla": KV21_PALETTE["F412L_VAN"], "Masked": KV21_PALETTE["F412L_HM"]},
@@ -722,6 +719,7 @@ def plot_split_comparison_with_experimentals(
     )
     _tint_violin_borders(axis)
     used_structures = set()
+    experimental_styles = {}
     structure_order = list(
         dict.fromkeys(row["Structure"] for row in (experimental_rows or []))
     )
@@ -732,25 +730,48 @@ def plot_split_comparison_with_experimentals(
         structure = row["Structure"]
         index = structure_order.index(structure)
         style = experimental_reference_style(structure, index)
+        experimental_styles.setdefault(structure, style)
         axis.scatter(
             list(shared).index(alias),
             row["Distance"],
             marker=style["marker"],
             s=30, facecolors="white", edgecolors=style["color"],
             linewidths=0.8, zorder=7,
-            label=structure if structure not in used_structures else None,
         )
         used_structures.add(structure)
     finish_axes(axis, title)
-    handles, labels = axis.get_legend_handles_labels()
     axis.get_legend().remove()
+    ensemble_handles = [
+        Line2D(
+            [0], [0], marker="<", linestyle="None", markersize=10,
+            markerfacecolor=colors[0], markeredgecolor=colors[0],
+            label=f"← {label1} (left half)",
+        ),
+        Line2D(
+            [0], [0], marker=">", linestyle="None", markersize=10,
+            markerfacecolor=colors[1], markeredgecolor=colors[1],
+            label=f"{label2} (right half) →",
+        ),
+    ]
+    experimental_handles = [
+        Line2D(
+            [0], [0], marker=experimental_styles[structure]["marker"],
+            linestyle="None", markersize=8, markerfacecolor="white",
+            markeredgecolor=experimental_styles[structure]["color"],
+            markeredgewidth=1.2, label=structure,
+        )
+        for structure in structure_order
+        if structure in experimental_styles
+    ]
+    handles = ensemble_handles + experimental_handles
+    labels = [handle.get_label() for handle in handles]
     figure.legend(
-        handles, labels, title="Ensembles and experimental structures",
+        handles, labels, title="Split halves and experimental structures",
         loc="lower center", bbox_to_anchor=(0.5, 0.01),
-        ncol=min(4, len(labels)), fontsize=8, title_fontsize=8, frameon=True,
+        ncol=min(4, len(labels)), fontsize=9.5, title_fontsize=10, frameon=True,
     )
     finish_figure(figure)
-    figure.subplots_adjust(bottom=0.32)
+    figure.subplots_adjust(bottom=0.34)
     plt.show()
     return axis
 

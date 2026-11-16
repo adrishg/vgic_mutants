@@ -188,10 +188,10 @@ def test_g402_glycine_primary_metric_cannot_silently_use_side_chain_distance():
         g402_common_ca_columns(legacy_only, "WT")
 
 
-def test_r406_overlap_screen_is_frozen_to_all_19_documented_pairs():
-    assert len(R406_SCREEN_PARTNERS) == len(R406_SCREEN_COLUMNS) == 19
+def test_r406_overlap_screen_is_frozen_to_all_17_common_pairs():
+    assert len(R406_SCREEN_PARTNERS) == len(R406_SCREEN_COLUMNS) == 17
     assert R406_SCREEN_PARTNERS[:2] == ("PHE1519", "VAL1520")
-    assert R406_SCREEN_PARTNERS[-2:] == ("GLU407", "GLU411")
+    assert R406_SCREEN_PARTNERS[-2:] == ("TRP1534", "SER1535")
     assert R406_SCREEN_COLUMNS == tuple(
         f"shortest_ARG406-{partner}" for partner in R406_SCREEN_PARTNERS
     )

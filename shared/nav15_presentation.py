@@ -37,15 +37,18 @@ def pocket_metrics(frame: pd.DataFrame, condition: str) -> pd.DataFrame:
             for residue in motif
             if f"shortest_{residue}-{receptor}" in frame
         ]
-        if not columns:
-            raise KeyError(f"No motif contact columns available for {label}")
-        contacts[label] = frame[columns].apply(
-            pd.to_numeric, errors="coerce"
-        ).min(axis=1)
+        if columns:
+            contacts[label] = frame[columns].apply(
+                pd.to_numeric, errors="coerce"
+            ).min(axis=1)
+        else:
+            contacts[label] = pd.Series(np.nan, index=frame.index, dtype=float)
     result = pd.DataFrame(contacts)
-    result["contacts_le6"] = (result <= 6.0).sum(axis=1)
-    result["engaged_fingerprint"] = result["contacts_le6"] >= 2
-    result["pocket_mean_A"] = result[list(POCKET_RECEPTORS)].mean(axis=1)
+    complete = result.notna().all(axis=1)
+    result["contacts_complete"] = complete
+    result["contacts_le6"] = (result[list(POCKET_RECEPTORS)] <= 6.0).sum(axis=1).where(complete)
+    result["engaged_fingerprint"] = (result["contacts_le6"] >= 2).where(complete)
+    result["pocket_mean_A"] = result[list(POCKET_RECEPTORS)].mean(axis=1).where(complete)
     return result
 
 
@@ -97,11 +100,16 @@ def plot_main_mask_tradeoff(
         (axes[1], "Gate diagonal (Å)", "Intracellular pore opening"),
         (axes[2], "Gate aspect ratio", "Square–rectangle pore geometry"),
     ]:
-        sns.violinplot(
-            data=selected, x="Dataset", y=column, order=order,
-            palette=[palette[label] for label in order],
-            inner="quartile", cut=0, linewidth=0.7, ax=ax,
-        )
+        plot_data = selected.dropna(subset=[column])
+        if plot_data.empty:
+            ax.text(.5, .5, "Required contact columns unavailable", ha="center", va="center",
+                    transform=ax.transAxes, fontsize=9, color="#5F5666")
+        else:
+            sns.violinplot(
+                data=plot_data, x="Dataset", y=column, order=order,
+                palette=[palette[label] for label in order],
+                inner="quartile", cut=0, linewidth=0.7, ax=ax,
+            )
         ax.set_xlabel("")
         ax.set_title(title)
         ax.tick_params(axis="x", rotation=18)
@@ -267,10 +275,16 @@ def plot_supplemental_pocket_profile(
         values="Median shortest distance (Å)",
     )
     fig, ax = plt.subplots(figsize=(9.5, 5.2))
-    sns.heatmap(
-        matrix, annot=True, fmt=".1f", cmap="Purples", linewidths=0.5,
-        cbar_kws={"label": "Median whole-motif shortest distance (Å)"}, ax=ax,
-    )
+    if matrix.dropna(how="all").empty:
+        ax.text(.5, .5, "Required pocket-contact columns unavailable", ha="center", va="center",
+                transform=ax.transAxes, fontsize=10, color="#5F5666")
+        ax.set_xticks([])
+        ax.set_yticks([])
+    else:
+        sns.heatmap(
+            matrix, annot=True, fmt=".1f", cmap="Purples", linewidths=0.5,
+            cbar_kws={"label": "Median whole-motif shortest distance (Å)"}, ax=ax,
+        )
     ax.set_title(r"$\mathrm{Na}_{\mathrm{V}}1.5$ supplemental | complete IFM/QQQ pocket-distance profile")
     ax.set_xlabel("Canonical receptor-pocket residue")
     ax.set_ylabel("")

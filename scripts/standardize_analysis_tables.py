@@ -19,7 +19,7 @@ CHANNEL_LABELS = {"kv21": "Kv2.1", "nav15": "Nav1.5", "cav12": "CaV1.2"}
 CONDITIONS = {
     "kv21": ("f412l", "l403a", "wt"),
     "nav15": ("qqq", "wt"),
-    "cav12": ("g490r", "g406r", "g402s", "wt"),
+    "cav12": ("g406r", "g402s", "wt"),
 }
 
 

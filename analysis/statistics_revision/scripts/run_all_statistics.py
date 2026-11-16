@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the trajectory-aware manuscript statistics revision.
+"""Run the trajectory-aware manuscript statistics.
 
 All outputs are additive and are written only beneath the requested output
 directory. Existing notebooks, source CSVs, figures, and manuscript files are
@@ -34,6 +34,7 @@ from trajectory_statistics import (
     select_one_snapshot,
     test_filename_parser,
 )
+from shared.dataset_selection import nav15_active_masked_distance_path, cav12_active_masked_distance_path
 
 
 BOOTSTRAP_REPLICATES = 1000
@@ -63,6 +64,54 @@ def read_csv(path: Path, repo_root: Path, **kwargs) -> pd.DataFrame:
     logging.info("input=%s resolved=%s", path, resolved)
     compression = "gzip" if path.suffix == ".gz" else "infer"
     return pd.read_csv(resolved, compression=compression, **kwargs)
+
+
+def analysis_distance_path(path: Path) -> Path:
+    """Prefer the registered final-QC distance export when it exists.
+
+    The active 50% manifests point to the complete 6,000-model distance
+    export.  Statistical comparisons in this script are defined on the
+    convergence/QC-qualified cohort, whose companion export carries the
+    ``all_ok_rmsd_3A`` suffix.
+    """
+    path = Path(path)
+    if "_all_ok_rmsd_3A" in path.stem:
+        return path
+    if path.name.endswith("_distances.csv"):
+        return path.with_name(path.stem + "_all_ok_rmsd_3A.csv")
+    return path
+
+
+def read_distance_csv(
+    path: Path,
+    repo_root: Path,
+    required: list[str],
+    companion_suffix: str | None = None,
+) -> tuple[pd.DataFrame, Path]:
+    """Read a final-QC distance table, joining a separate coordinate panel if needed."""
+    from shared import data_access
+    path = Path(path)
+
+    selected = analysis_distance_path(path)
+    frame = read_csv(selected, repo_root)
+    missing = [column for column in required if column not in frame]
+    if missing and companion_suffix:
+        name = selected.name
+        if "_all_ok_rmsd_3A" in selected.stem:
+            companion_name = name.replace(
+                "_all_ok_rmsd_3A.csv", f"_{companion_suffix}_all_ok_rmsd_3A.csv"
+            )
+        else:
+            companion_name = name.replace("_distances.csv", f"_distances_{companion_suffix}.csv")
+        companion = selected.with_name(companion_name)
+        extra = read_csv(companion, repo_root)
+        if "pdb_file" not in frame or "pdb_file" not in extra:
+            raise KeyError(f"Cannot join distance companion for {selected}: missing pdb_file")
+        overlap = [column for column in extra.columns if column in frame.columns and column != "pdb_file"]
+        extra = extra.drop(columns=overlap)
+        frame = frame.merge(extra, on="pdb_file", how="left", validate="one_to_one")
+        logging.info("joined companion=%s into=%s", data_access.resolve(companion), selected)
+    return frame, selected
 
 
 def require_columns(frame: pd.DataFrame, columns: list[str], source: Path) -> None:
@@ -291,9 +340,9 @@ def contact_summary(frame, value_col, dataset, seed):
 def cav12_analysis(repo_root: Path, output: Path, seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     g402_files = {
         "WT_vanilla": "cav12/dataDistances/26-02-10_Cav12_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-        "WT_masked": "cav12/dataDistances/26-02-10_Cav12_wt_maskedAF2_distances_all_ok_rmsd_3A.csv",
+        "WT_masked": str(cav12_active_masked_distance_path(repo_root, "WT")),
         "G402S_vanilla": "cav12/dataDistances/26-02-10_Cav12_g402s_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-        "G402S_masked": "cav12/dataDistances/26-02-10_Cav12_g402s_maskedAF2_distances_all_ok_rmsd_3A.csv",
+        "G402S_masked": str(cav12_active_masked_distance_path(repo_root, "G402S")),
     }
     partners = [
         "PHE1519", "VAL1520", "ALA1521", "VAL1522", "ILE1523", "MET1524",
@@ -302,12 +351,16 @@ def cav12_analysis(repo_root: Path, output: Path, seed: int) -> tuple[pd.DataFra
     ]
     rows=[]
     for file_index, (dataset, relative) in enumerate(g402_files.items()):
-        source=repo_root/relative; frame=read_csv(source,repo_root)
+        source=repo_root/relative
         focal = "GLY402" if dataset.startswith("WT_") else "SER402"
         contacts = [
             (f"position402_CA-{partner}_CA", f"CA_{focal}_CA-{partner}_CA")
             for partner in partners
         ]
+        frame, selected_source = read_distance_csv(
+            relative, repo_root, [column for _, column in contacts], companion_suffix="extra"
+        )
+        source = repo_root / selected_source
         for contact_index,(contact,column) in enumerate(contacts):
             require_columns(frame,["pdb_file",column],source)
             summary,_=contact_summary(frame[["pdb_file",column]].copy(),column,dataset,seed+file_index*20+contact_index*5)
@@ -318,11 +371,19 @@ def cav12_analysis(repo_root: Path, output: Path, seed: int) -> tuple[pd.DataFra
 
     g406_files={
         "vanilla":"cav12/dataDistances/26-07-25_Cav1.2_g406r_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-        "masked":"cav12/dataDistances/26-07-25_Cav1.2_g406r_maskedAF2_distances_all_ok_rmsd_3A.csv",
+        "masked":str(cav12_active_masked_distance_path(repo_root, "G406R")),
     }
     rows=[]; plot_frames=[]
     for file_index,(protocol,relative) in enumerate(g406_files.items()):
-        source=repo_root/relative; frame=read_csv(source,repo_root)
+        source=repo_root/relative
+        required = [
+            "pdb_file", "shortest_ARG406-ASP1528",
+            "shortest_ARG406-ASP1533", "shortest_ARG406-THR1531",
+        ]
+        frame, selected_source = read_distance_csv(
+            relative, repo_root, required, companion_suffix="extra"
+        )
+        source = repo_root / selected_source
         centered=[c for c in frame if c.startswith("shortest_ARG406-")]
         require_columns(frame,["pdb_file","shortest_ARG406-ASP1528","shortest_ARG406-ASP1533","shortest_ARG406-THR1531"],source)
         if not centered: raise KeyError(f"No R406-centered columns in {source}")
@@ -353,20 +414,24 @@ def cav12_analysis(repo_root: Path, output: Path, seed: int) -> tuple[pd.DataFra
 def nav15_analysis(repo_root: Path, output: Path, seed: int) -> pd.DataFrame:
     files={
         "WT | vanilla":"nav15/dataDistances/26-07-27_Nav15_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-        "WT | masked":"nav15/dataDistances/26-07-25_Nav15_wt_masked_AF2_distances_extra_ifm_all_ok_rmsd_3A.csv",
-        "WT | masked v2":"nav15/dataDistances/26-07-27_Nav15_wt_maskedv2_AF2_distances_all_ok_rmsd_3A.csv",
-        "WT | masked v2 no-IFM":"nav15/dataDistances/26-07-27_Nav15_wt_maskedv2_noIFM_AF2_distances_all_ok_rmsd_3A.csv",
+        "WT | masked":str(nav15_active_masked_distance_path(repo_root, "WT", "v1")),
+        "WT | masked v2":str(nav15_active_masked_distance_path(repo_root, "WT", "v2")),
         "QQQ | vanilla":"nav15/dataDistances/26-07-27_Nav15_qqq_vanilla_AF2_distances_all_ok_rmsd_3A.csv",
-        "QQQ | masked":"nav15/dataDistances/26-07-27_Nav15_qqq_masked_AF2_distances_all_ok_rmsd_3A.csv",
-        "QQQ | masked v2":"nav15/dataDistances/26-07-27_Nav15_qqq_maskedv2_AF2_distances_all_ok_rmsd_3A.csv",
+        "QQQ | masked":str(nav15_active_masked_distance_path(repo_root, "QQQ", "v1")),
+        "QQQ | masked v2":str(nav15_active_masked_distance_path(repo_root, "QQQ", "v2")),
     }
     gate_cols=["CA_MET415_CA-ALA742_CA","CA_MET415_CA-ILE1154_CA","CA_MET415_CA-ILE1455_CA","CA_ALA742_CA-ILE1154_CA","CA_ALA742_CA-ILE1455_CA","CA_ILE1154_CA-ILE1455_CA"]
     rows=[]; combined=[]; map_rows=[]
     for file_index,(dataset,relative) in enumerate(files.items()):
-        source=repo_root/relative; frame=read_csv(source,repo_root); condition=dataset.split(" | ")[0]
+        source=repo_root/relative; condition=dataset.split(" | ")[0]
         central="PHE1170" if condition=="WT" else "GLN1170"; motif=["ILE1169","PHE1170","MET1171"] if condition=="WT" else ["GLN1169","GLN1170","GLN1171"]
         ca1=f"CA_{central}_CA-ASN1343_CA"; ca2=f"CA_{central}_CA-ASN1449_CA"; term1=f"shortest_{central}-ASN1343"; term2=f"shortest_{central}-ASN1449"; motif_cols=[f"shortest_{res}-ASN1343" for res in motif]
-        required=["pdb_file",ca1,ca2,term1,term2]; require_columns(frame,required,source)
+        required=["pdb_file",ca1,ca2,term1,term2]
+        frame, selected_source = read_distance_csv(
+            relative, repo_root, required, companion_suffix="extra_ifm"
+        )
+        source = repo_root / selected_source
+        require_columns(frame,required,source)
         gate_available=all(column in frame for column in gate_cols)
         motif_available=all(column in frame for column in motif_cols)
         if not gate_available:
@@ -387,7 +452,7 @@ def nav15_analysis(repo_root: Path, output: Path, seed: int) -> pd.DataFrame:
         combined.append(frame[["dataset","trajectory_id","recycle_number","terminal_N1659_A","terminal_N1765_A","whole_motif_N1659_A","motif_separation_A","gate_max_A"]])
         map_rows.append({"figure_panel":"Figure 2E baseline" if dataset=="WT | masked v2" else "Figure 6 / Figure S4 control","sequence":condition,"protocol":dataset.split(" | ",1)[1],"mask_name":{"WT | vanilla":"unmodified MSA","WT | masked":"nav15_standard","WT | masked v2":"mask v2","WT | masked v2 no-IFM":"mask v2 noIFM","QQQ | vanilla":"unmodified MSA","QQQ | masked":"nav15_standard_plus_IFM","QQQ | masked v2":"mask v2"}[dataset],"source_csv":relative,"source_notebook":"nav15/Nav15_IFM_latching_analysis.ipynb","trajectory_count":frame["trajectory_id"].nunique(),"snapshot_count":len(frame),"notes":f"Exact label preserved; designs are not interchangeable. gate_available={gate_available}; complete_motif_available={motif_available}."})
     result=pd.DataFrame(rows); save_table(result,output/"tables/Nav15_trajectory_aware_statistics.csv"); save_table(pd.DataFrame(map_rows),output/"tables/Nav15_figure_condition_map.csv")
-    plot=pd.concat(combined,ignore_index=True); selected=plot[plot["dataset"].isin(["WT | vanilla","WT | masked","WT | masked v2","WT | masked v2 no-IFM","QQQ | vanilla","QQQ | masked","QQQ | masked v2"])]
+    plot=pd.concat(combined,ignore_index=True); selected=plot[plot["dataset"].isin(["WT | vanilla","WT | masked","WT | masked v2","QQQ | vanilla","QQQ | masked","QQQ | masked v2"])]
     fig,axes=plt.subplots(1,2,figsize=(12,4.6)); sns.violinplot(data=selected,x="dataset",y="whole_motif_N1659_A",inner="quart",cut=0,ax=axes[0],color="#9D7BB0"); axes[0].tick_params(axis="x",rotation=35); axes[0].set(xlabel="",ylabel="Minimum motif-N1659 terminal distance (Å)",title="A  Mask-design control")
     sns.scatterplot(data=selected.sample(min(5000,len(selected)),random_state=seed),x="terminal_N1659_A",y="motif_separation_A",hue="dataset",s=10,alpha=.25,ax=axes[1]); axes[1].set(title="B  Cα versus terminal-atom consistency",xlabel="Central motif-N1659 terminal distance (Å)",ylabel="Mean Cα motif-receptor separation (Å)"); axes[1].legend(fontsize=6)
     fig.suptitle("NaV1.5 IFM/QQQ mask controls",fontweight="bold"); fig.tight_layout(); fig.savefig(output/"figures/Figure_S4_Nav15_mask_controls.pdf",bbox_inches="tight"); fig.savefig(output/"figures/Figure_S4_Nav15_mask_controls.png",dpi=400,bbox_inches="tight"); plt.close(fig)

@@ -26,6 +26,11 @@ if str(ROOT) not in sys.path:
 from shared.distribution_statistics import parse_trajectory_metadata
 from shared.seed_block_statistics import analyze_seed_distance, leave_one_model_out
 from scripts.ensemble_rmsf_analysis.io import resolve_local_lfs_object
+from shared.dataset_selection import (
+    kv21_active_masked_distance_path,
+    nav15_active_masked_distance_path,
+    cav12_active_masked_distance_path,
+)
 
 
 BASE_SEED = 20260819
@@ -38,24 +43,23 @@ GATE_COLUMNS = [
 
 FINAL_DISTANCE_PATHS = {
     "kv21|WT|vanilla": "kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2test_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-    "kv21|WT|masked": "kv21/dataDistances/26-02-11_Kv2.1_wt_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+    "kv21|WT|masked": str(kv21_active_masked_distance_path(ROOT, "WT")),
     "kv21|L403A|vanilla": "kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-    "kv21|L403A|masked": "kv21/dataDistances/26-02-11_Kv2.1_l403a_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+    "kv21|L403A|masked": str(kv21_active_masked_distance_path(ROOT, "L403A")),
     "kv21|F412L|vanilla": "kv21/dataDistances/26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-    "kv21|F412L|masked": "kv21/dataDistances/26-02-11_Kv2.1_f412l_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+    "kv21|F412L|masked": str(kv21_active_masked_distance_path(ROOT, "F412L")),
     "nav15|WT|vanilla": "nav15/dataDistances/26-07-27_Nav15_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-    "nav15|WT|masked": "nav15/dataDistances/26-07-25_Nav15_wt_masked_AF2_distances_extra_ifm_all_ok_rmsd_3A.csv",
-    "nav15|WT|masked_v2": "nav15/dataDistances/26-07-27_Nav15_wt_maskedv2_AF2_distances_all_ok_rmsd_3A.csv",
-    "nav15|WT|masked_v2_noIFM": "nav15/dataDistances/26-07-27_Nav15_wt_maskedv2_noIFM_AF2_distances_all_ok_rmsd_3A.csv",
+    "nav15|WT|masked": str(nav15_active_masked_distance_path(ROOT, "WT", "v1")),
+    "nav15|WT|masked_v2": str(nav15_active_masked_distance_path(ROOT, "WT", "v2")),
     "nav15|QQQ|vanilla": "nav15/dataDistances/26-07-27_Nav15_qqq_vanilla_AF2_distances_all_ok_rmsd_3A.csv",
-    "nav15|QQQ|masked": "nav15/dataDistances/26-07-27_Nav15_qqq_masked_AF2_distances_all_ok_rmsd_3A.csv",
-    "nav15|QQQ|masked_v2": "nav15/dataDistances/26-07-27_Nav15_qqq_maskedv2_AF2_distances_all_ok_rmsd_3A.csv",
+    "nav15|QQQ|masked": str(nav15_active_masked_distance_path(ROOT, "QQQ", "v1")),
+    "nav15|QQQ|masked_v2": str(nav15_active_masked_distance_path(ROOT, "QQQ", "v2")),
     "cav12|WT|vanilla": "cav12/dataDistances/26-02-10_Cav12_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-    "cav12|WT|masked": "cav12/dataDistances/26-02-10_Cav12_wt_maskedAF2_distances_all_ok_rmsd_3A.csv",
+    "cav12|WT|masked": str(cav12_active_masked_distance_path(ROOT, "WT")),
     "cav12|G402S|vanilla": "cav12/dataDistances/26-02-10_Cav12_g402s_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-    "cav12|G402S|masked": "cav12/dataDistances/26-02-10_Cav12_g402s_maskedAF2_distances_all_ok_rmsd_3A.csv",
+    "cav12|G402S|masked": str(cav12_active_masked_distance_path(ROOT, "G402S")),
     "cav12|G406R|vanilla": "cav12/dataDistances/26-07-25_Cav1.2_g406r_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-    "cav12|G406R|masked": "cav12/dataDistances/26-07-25_Cav1.2_g406r_maskedAF2_distances_all_ok_rmsd_3A.csv",
+    "cav12|G406R|masked": str(cav12_active_masked_distance_path(ROOT, "G406R")),
 }
 
 
@@ -67,8 +71,43 @@ def save(frame: pd.DataFrame, path: Path) -> None:
 def read_csv(path: Path, **kwargs) -> pd.DataFrame:
     """Read a CSV from the working tree, the local cache, or Hugging Face."""
     from shared import data_access
+    path = Path(path)
+    selected = path
+    if "dataDistances" in path.parts and path.name.endswith("_distances.csv"):
+        candidate = path.with_name(path.stem + "_all_ok_rmsd_3A.csv")
+        try:
+            data_access.resolve(candidate)
+        except (FileNotFoundError, data_access.DataUnavailable):
+            pass
+        else:
+            selected = candidate
+    frame = pd.read_csv(data_access.resolve(selected), **kwargs)
 
-    return pd.read_csv(data_access.resolve(path), **kwargs)
+    # Current CaV1.2 50% exports keep the mutation-centered shortest-distance
+    # panel in a companion ``extra`` table. Join it for full-frame analyses;
+    # usecols-only manifest/key reads remain lightweight and unchanged.
+    if (
+        "usecols" not in kwargs
+        and "cav12" in path.parts
+        and "dataDistances" in path.parts
+        and "masked" in selected.name
+        and "pdb_file" in frame.columns
+    ):
+        companion = selected.with_name(
+            selected.name.replace(
+                "_all_ok_rmsd_3A.csv", "_extra_all_ok_rmsd_3A.csv"
+            )
+        )
+        try:
+            extra = pd.read_csv(data_access.resolve(companion))
+        except (FileNotFoundError, data_access.DataUnavailable):
+            extra = None
+        if extra is not None and "pdb_file" in extra.columns:
+            overlap = [c for c in extra.columns if c in frame.columns and c != "pdb_file"]
+            frame = frame.merge(
+                extra.drop(columns=overlap), on="pdb_file", how="left", validate="one_to_one"
+            )
+    return frame
 
 
 def add_metadata(frame: pd.DataFrame) -> pd.DataFrame:
@@ -569,6 +608,15 @@ def nav15_correlation(output: Path, bootstrap: int) -> None:
 
 
 def cav12_focal(output: Path, bootstrap: int) -> None:
+    missing = [
+        key for key in ("cav12|G402S|masked", "cav12|G406R|masked")
+        if key not in FINAL_DISTANCE_PATHS
+    ]
+    if missing:
+        raise FileNotFoundError(
+            "Corrected CaV1.2 masked mutant cohorts are not available; "
+            "legacy masked files are intentionally not used: " + ", ".join(missing)
+        )
     categorical_rows = []
     g402_parts = {}
     for protocol in ("vanilla", "masked"):

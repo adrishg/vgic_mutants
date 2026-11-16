@@ -123,25 +123,21 @@ def plot_g402s_paired_revision(root):
 def plot_g406r_screen_and_contacts(root):
     """Put the R406 overlap-screen yield beside conditional contacts."""
     folder = root / "analysis/statistics_revision/paired_seed_v2"
-    results = pd.read_csv(folder / "g406r_coordinate_screen_statistics.csv")
-    denominators = pd.read_csv(folder / "g406r_coordinate_screen_summary.csv")
-    results = results[
-        results.atom_selection_rule.eq("side_chain_non_hydrogen_atoms")
-    ].copy()
-    denominators = denominators[
-        denominators.atom_selection_rule.eq("side_chain_non_hydrogen_atoms")
-    ].copy()
-    primary = results[results.estimand_id.eq("primary_joint_nominal_seed")].set_index(
-        "outcome"
-    )
-    required = [
-        "unconditional_snapshot_screen_pass_fraction",
-        "conditional_ASP1528_contact_fraction",
-        "conditional_ASP1533_contact_fraction",
+    denominators = pd.read_csv(folder / "g406r_screen_denominators.csv")
+    denominators["partner_residue"] = denominators["partner"]
+    denominators["atom_selection_rule"] = "side_chain_non_hydrogen_atoms"
+    denominators["unconditional_pass_fraction"] = denominators[
+        "unconditional_snapshot_pass_fraction"
     ]
-    missing = sorted(set(required) - set(primary.index))
-    if missing:
-        raise KeyError(f"Missing R406 screen outcomes: {missing}")
+    denominators["conditional_contact_denominator"] = denominators[
+        "conditional_contact_denominator_passing_snapshots"
+    ]
+    denominators["conditional_contact_numerator"] = denominators[
+        "passing_and_within_4A_snapshots"
+    ]
+    denominators["conditional_contact_fraction"] = denominators[
+        "conditional_contact_fraction"
+    ]
 
     fig, (screen_ax, contact_ax) = plt.subplots(1, 2, figsize=(10.5, 5.4), sharey=True)
     colors = [CAV12_PALETTE["G406R_VAN"], CAV12_PALETTE["G406R_HM"]]
@@ -153,7 +149,16 @@ def plot_g406r_screen_and_contacts(root):
     screen_ax.set(xticks=[0, 1], xticklabels=["vanilla", "masked"],
                   ylabel="Fraction of retained snapshots (%)",
                   title="A. Passed explicit R406 side-chain\noverlap screen")
-    screen_ax.text(.5, .60, "−31.7 percentage points\nwhole-seed 95% interval: −33.2 to −30.3",
+    overlap = pd.read_csv(folder / "g406r_overlap_and_contacts.csv")
+    overlap = overlap[
+        (overlap["outcome"] == "overlap_pass")
+        & (overlap["estimand_id"] == "primary_joint_nominal_seed")
+    ].iloc[0]
+    screen_ax.text(
+        .5, .60,
+        f"{100 * overlap.estimate_B_minus_A:.1f} percentage points\n"
+        f"95% interval: {100 * overlap.CI_low_B_minus_A:.1f} to "
+        f"{100 * overlap.CI_high_B_minus_A:.1f}",
                    transform=screen_ax.transAxes, ha="center", va="center", fontsize=9)
 
     x = np.arange(2)
@@ -183,7 +188,7 @@ def plot_g406r_screen_and_contacts(root):
     fig.suptitle("Cav1.2 | G406R | overlap screen and conditional proximity",
                  fontweight="bold")
     fig.text(.5, .025,
-             "Passing means none of the 19 explicit side-chain-heavy R406-centered distances was <2 Å. "
+             "Passing means none of the 17 common side-chain-heavy R406-centered distances was <2 Å. "
              "It does not validate the entire pocket. Conditional contact fractions use only pass snapshots.",
              ha="center", fontsize=9)
     fig.tight_layout(rect=(0, .10, 1, .91))

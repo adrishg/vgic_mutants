@@ -40,7 +40,7 @@ def main() -> None:
                     "channel": {"kv21": "Kv2.1", "nav15": "Nav1.5", "cav12": "CaV1.2"}[channel],
                     "condition": next(
                         (part for part in relative.parts if part.lower() in
-                         {"wt", "l403a", "f412l", "qqq", "g402s", "g406r", "g490r"}),
+                         {"wt", "l403a", "f412l", "qqq", "g402s", "g406r"}),
                         "multiple or not condition-specific",
                     ),
                     "source": str(source.relative_to(args.repo_root)),

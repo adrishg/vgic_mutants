@@ -1,0 +1,105 @@
+project:
+  name: CaV1.2 50% ensemble RMSF
+  channel: CaV1.2
+  project_root: data/Cav1.2
+  output_root: outputs/cav12_rmsf
+
+residue_axis:
+  start: 1
+  end: 1685
+
+model_chain: A
+
+sequence_fastas:
+  wt: data/Cav1.2/wt/cav12_wt_short.fasta
+  g402s: data/Cav1.2/g402s/cav12_short_g402s.fasta
+  g406r: data/Cav1.2/g406r/cav12_g406r_short.fasta
+
+datasets:
+  - name: wt_vanilla
+    sequence_condition: wt
+    protocol: vanilla
+    path: data/Cav1.2/wt/vanilla
+  - name: wt_masked_v3_50pct
+    sequence_condition: wt
+    protocol: masked
+    path: data/Cav1.2/wt/masked_v3_50pct/models
+  - name: g402s_vanilla
+    sequence_condition: g402s
+    protocol: vanilla
+    path: data/Cav1.2/g402s/vanilla
+  - name: g402s_masked_v3_50pct
+    sequence_condition: g402s
+    protocol: masked
+    path: data/Cav1.2/g402s/masked_v3_50pct/models
+  - name: g406r_vanilla
+    sequence_condition: g406r
+    protocol: vanilla
+    path: data/Cav1.2/g406r/vanilla
+  - name: g406r_masked_v3_50pct
+    sequence_condition: g406r
+    protocol: masked
+    path: data/Cav1.2/g406r/masked_v3_50pct/models
+
+references:
+  anchor_id: 8WE6
+  structures:
+    - id: 8WE6
+      state: human_CaV1.2_high_resolution_reference
+      relationship: common_coordinate_anchor_and_primary_WT_reference
+      species: human
+      sequence_condition: wt
+      path: data/Cav1.2/experimental/8WE6.pdb
+      chain: A
+    - id: 8HLP
+      state: human_CaV1.2_apo_reference
+      relationship: secondary_WT_state_reference
+      species: human
+      sequence_condition: wt
+      path: data/Cav1.2/experimental/8HLP.pdb
+      chain: A
+    - id: 8FD7
+      state: human_CaV1.2_gabapentin_complex
+      relationship: secondary_ligand_bound_WT_reference
+      species: human
+      sequence_condition: wt
+      path: data/Cav1.2/experimental/8FD7.pdb
+      chain: K
+
+alignment_core:
+  name: stable_core_excluding_IS6_mutation_window
+  raw_ranges:
+    - [112, 381]
+    - [524, 759]
+    - [901, 1145]
+    - [1160, 1197]
+    - [1239, 1323]
+    - [1370, 1534]
+  minimum_matched_ca: 850
+  minimum_coverage: 0.80
+
+annotations:
+  raw_regions:
+    - name: G402_mutation_site
+      raw_start: 402
+      raw_end: 402
+    - name: G406_mutation_site
+      raw_start: 406
+      raw_end: 406
+    - name: IS6_mutation_window
+      raw_start: 382
+      raw_end: 426
+
+sequence_alignment:
+  match_score: 2.0
+  mismatch_score: -1.0
+  open_gap_score: -10.0
+  extend_gap_score: -0.5
+  end_gap_score: 0.0
+
+analysis:
+  recursive: true
+  minimum_residue_coverage: 0.80
+  coordinate_dtype: float32
+  bootstrap_replicates: 0
+  bootstrap_seed: 20260728

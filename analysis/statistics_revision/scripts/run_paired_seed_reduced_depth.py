@@ -79,7 +79,7 @@ def main() -> None:
             "fraction_same_direction": table.same_direction_as_full.mean(),
             "median_relative_error": table.relative_error.median(),
             "fraction_subset_interval_contains_full_ensemble_point_estimate": table.subset_interval_contains_full_ensemble_point_estimate.mean(),
-            "interpretation": "retrospective stability; not frequentist coverage or a stopping rule",
+            "interpretation": "reduced-depth stability; not frequentist coverage or a stopping rule",
             "inner_bootstrap_replicates": args.inner_bootstrap,
             "random_seed": BASE_SEED + 9000,
         })

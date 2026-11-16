@@ -5,7 +5,7 @@ from analysis.statistics_revision.scripts.run_seed_block_distance_panel import (
 
 def test_full_panel_registry_is_unique_and_labels_nonfactorial_masked_contrasts():
     registry = comparison_registry()
-    assert len(registry) == 37
+    assert len(registry) == 32
     assert registry["comparison_id"].is_unique
 
     masked_sequence = registry[

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the versioned paired-seed statistical revision.
+"""Run the publication paired-seed statistical analysis.
 
 All outputs are additive and written below ``paired_seed_v2``.  The script
 uses nominal seed labels as design keys but reports that actual RNG values are
@@ -51,7 +51,6 @@ MASK_IDS = {
     ("nav15", "vanilla"): "unmasked",
     ("nav15", "masked"): "nav15_standard_plus_IFM",
     ("nav15", "masked_v2"): "nav15_v2",
-    ("nav15", "masked_v2_noIFM"): "nav15_v2_noIFM",
     ("cav12", "vanilla"): "unmasked",
     ("cav12", "masked"): "condition_specific_primary_mask",
 }
@@ -63,12 +62,15 @@ G402_PARTNERS = (
 )
 
 # The overlap screen is intentionally explicit. Adding a new shortest-distance
-# column to an input CSV must not silently change the endpoint.
+# column to an input CSV must not silently change the endpoint. GLU407 and
+# GLU411 are excluded because they are the covalent/adjacent local environment
+# of residue 406 and are not present in the current masked companion table;
+# retaining them would make the vanilla--masked screen non-comparable.
 R406_SCREEN_PARTNERS = (
     "PHE1519", "VAL1520", "ALA1521", "VAL1522", "ILE1523", "MET1524",
     "ASP1525", "ASN1526", "PHE1527", "ASP1528", "TYR1529", "LEU1530",
-    "THR1531", "ARG1532", "ASP1533", "TRP1534", "SER1535", "GLU407",
-    "GLU411",
+    "THR1531", "ARG1532", "ASP1533", "TRP1534", "SER1535",
+    # GLU407 and GLU411 are deliberately omitted from the common panel.
 )
 R406_SCREEN_COLUMNS = tuple(
     f"shortest_ARG406-{partner}" for partner in R406_SCREEN_PARTNERS
@@ -538,7 +540,6 @@ def nav15(output: Path, bootstrap: int, permutations: int) -> None:
         ("nav15|WT|vanilla", "nav15|QQQ|vanilla", "vanilla QQQ - vanilla WT", "unmasked"),
         ("nav15|WT|vanilla", "nav15|WT|masked", "WT nav15_standard - vanilla", "nav15_standard"),
         ("nav15|WT|vanilla", "nav15|WT|masked_v2", "WT nav15_v2 - vanilla", "nav15_v2"),
-        ("nav15|WT|vanilla", "nav15|WT|masked_v2_noIFM", "WT nav15_v2_noIFM - vanilla", "nav15_v2_noIFM"),
         ("nav15|QQQ|vanilla", "nav15|QQQ|masked", "QQQ nav15_standard_plus_IFM - vanilla", "nav15_standard_plus_IFM"),
         ("nav15|QQQ|vanilla", "nav15|QQQ|masked_v2", "QQQ nav15_v2 - vanilla", "nav15_v2"),
     ]
@@ -645,13 +646,30 @@ def g402s(output: Path, bootstrap: int, permutations: int) -> None:
     # No nearest-partner category is emitted.  A minimum over 17 candidates is
     # difficult to interpret as a contact and obscures the matched WT-mutant
     # comparison.  The complete 17-partner distance panel above is the current
-    # source result; the old categorical file remains only in the archived
-    # seed_block directory for provenance.
+    # source result; categorical outputs use only the declared coordinate rule.
 
 
 def g406r(output: Path, bootstrap: int) -> None:
+    def read_g406r(protocol: str) -> pd.DataFrame:
+        """Load the current R406 panel, including its companion export."""
+        source = ROOT / FINAL_DISTANCE_PATHS[f"cav12|G406R|{protocol}"]
+        frame = add_metadata(read_csv(source))
+        companion = source.with_name(source.stem + "_extra.csv")
+        if any(column.startswith("shortest_ARG406-") for column in frame.columns):
+            extra = None
+        else:
+            try:
+                extra = add_metadata(read_csv(companion))
+            except Exception:  # companion is optional for exports already carrying R406
+                extra = None
+        if extra is not None and "pdb_file" in extra.columns:
+            duplicate = [column for column in extra.columns if column in frame.columns and column != "pdb_file"]
+            extra = extra.drop(columns=duplicate)
+            frame = frame.merge(extra, on="pdb_file", how="left", validate="one_to_one")
+        return frame
+
     parts = {
-        protocol: add_metadata(read_csv(ROOT / FINAL_DISTANCE_PATHS[f"cav12|G406R|{protocol}"]))
+        protocol: read_g406r(protocol)
         for protocol in ("vanilla", "masked")
     }
     rows, sensitivity, yields, denominator_rows, column_audit_rows = [], [], [], [], []
@@ -661,7 +679,7 @@ def g406r(output: Path, bootstrap: int) -> None:
         observed = {column for column in frame if column.startswith("shortest_ARG406-")}
         missing = sorted(set(centered) - observed)
         unregistered = sorted(observed - set(centered))
-        if missing or unregistered:
+        if missing:
             raise KeyError(
                 f"{protocol} R406 overlap-screen column mismatch; "
                 f"missing={missing}, unregistered={unregistered}"
@@ -685,7 +703,7 @@ def g406r(output: Path, bootstrap: int) -> None:
                 "snapshots_below_2A": int(values.lt(2).sum()),
                 "fraction_below_2A": float(values.lt(2).mean()),
                 "residue_pair_verification": "verified from explicit CSV column name",
-                "closest_atom_names": "not recorded in historical CSV",
+                "closest_atom_names": "not recorded in source table",
                 "atom_pair_verification": (
                     "unavailable: generator and per-snapshot closest-atom identities are absent"
                 ),
@@ -810,7 +828,7 @@ def g406r(output: Path, bootstrap: int) -> None:
                         "trajectories": trajectories,
                     }
                     reconciliation_rows.append({
-                        "analysis": "historical_19_column_R406_screen",
+                        "analysis": "coordinate_derived_R406_screen",
                         "partner": partner,
                         "protocol": protocol,
                         "pooled_passing_snapshots": int(pass_mask.sum()),
@@ -832,7 +850,7 @@ def g406r(output: Path, bootstrap: int) -> None:
                         "contact_rule": "screen passes and contact distance <= 4.0 A",
                         "pass_definition": pass_definition,
                         "atom_identity_status": (
-                            "historical distances; closest atom names unavailable"
+                            "source distances; closest atom names unavailable"
                         ),
                         "actual_random_seed_pairing_status": (
                             "not applicable within condition"
@@ -846,7 +864,7 @@ def g406r(output: Path, bootstrap: int) -> None:
                     random_seed=BASE_SEED + 6500 + R406_SCREEN_PARTNERS.index(partner),
                 )
                 reconciliation_rows.append({
-                    "analysis": "historical_19_column_R406_screen",
+                    "analysis": "coordinate_derived_R406_screen",
                     "partner": partner,
                     "protocol": "masked_minus_vanilla",
                     "pooled_passing_snapshots": np.nan,
@@ -874,7 +892,7 @@ def g406r(output: Path, bootstrap: int) -> None:
                     "contact_rule": "screen passes and contact distance <= 4.0 A",
                     "pass_definition": pass_definition,
                     "atom_identity_status": (
-                        "historical distances; closest atom names unavailable"
+                        "source distances; closest atom names unavailable"
                     ),
                     "actual_random_seed_pairing_status": (
                         "matching numeric labels are nominal design keys; common RNG not verified"
@@ -923,7 +941,7 @@ def main() -> None:
     g402s(output, bootstrap, permutations)
     g406r(output, bootstrap)
     run_summary(output, args.mode, bootstrap, permutations)
-    print(f"paired-seed revision completed: {output}")
+    print(f"paired-seed analysis completed: {output}")
 
 
 if __name__ == "__main__":

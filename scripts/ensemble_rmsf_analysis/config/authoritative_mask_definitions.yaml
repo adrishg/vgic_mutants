@@ -4,8 +4,8 @@ authority: User-supplied authoritative RMSF mask table
 mask_definitions:
   kv21_common:
     raw_length: 600
-    ranges: "288-328, 370-384, 401-417"
-    expected_count: 73
+    ranges: "256-260, 276-280, 288-328, 370-417"
+    expected_count: 99
 
   nav15_standard:
     raw_length: 1572
@@ -46,11 +46,6 @@ mask_definitions:
     add_ranges: "402-406"
     expected_count: 268
 
-  cav12_g490r:
-    raw_length: 1685
-    base: cav12_wt_common
-    add_ranges: "485-495"
-    expected_count: 274
 
 datasets:
   kv21:
@@ -60,11 +55,9 @@ datasets:
   nav15:
     wt_masked: {mask: nav15_standard}
     wt_masked_v2: {mask: nav15_v2}
-    wt_masked_v2_noIFM: {mask: nav15_v2_noIFM}
     qqq_masked: {mask: nav15_standard_plus_IFM, mutation_ranges: "1169-1171"}
     qqq_masked_v2: {mask: nav15_v2, mutation_ranges: "1169-1171"}
   cav12:
     wt_masked: {mask: cav12_wt_common}
     g402s_masked: {mask: cav12_g402s, mutation_position: 402}
     g406r_masked: {mask: cav12_g406r, mutation_position: 406}
-    g490r_masked: {mask: cav12_g490r, mutation_position: 490}

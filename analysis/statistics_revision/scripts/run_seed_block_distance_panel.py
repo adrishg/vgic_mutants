@@ -72,8 +72,6 @@ COMPARISON_ROWS = [
     ("kv_wtvan_f412lmask", "kv21", "WT", "vanilla", "F412L", "masked", "cross_protocol_sequence", "sensitivity", "non-equivalent sequence and protocol"),
     ("kv_wtmask_f412lvan", "kv21", "WT", "masked", "F412L", "vanilla", "cross_protocol_sequence", "sensitivity", "non-equivalent sequence and protocol"),
     ("nav_wt_van_maskv2", "nav15", "WT", "vanilla", "WT", "masked_v2", "protocol_effect", "primary", "WT v2 mask effect"),
-    ("nav_wt_van_noifm", "nav15", "WT", "vanilla", "WT", "masked_v2_noIFM", "protocol_effect", "primary", "WT v2-noIFM mask effect"),
-    ("nav_wt_maskv2_noifm", "nav15", "WT", "masked_v2", "WT", "masked_v2_noIFM", "mask_design_sensitivity", "sensitivity", "IFM inclusion sensitivity within WT"),
     ("nav_qqq_van_mask", "nav15", "QQQ", "vanilla", "QQQ", "masked", "protocol_effect", "primary", "QQQ standard-plus-IFM mask effect"),
     ("nav_qqq_van_maskv2", "nav15", "QQQ", "vanilla", "QQQ", "masked_v2", "protocol_effect", "primary", "QQQ v2 mask effect"),
     ("nav_qqq_mask_maskv2", "nav15", "QQQ", "masked", "QQQ", "masked_v2", "mask_design_sensitivity", "sensitivity", "mask design sensitivity within QQQ"),
@@ -83,9 +81,6 @@ COMPARISON_ROWS = [
     ("nav_wtvan_qqqmaskv2", "nav15", "WT", "vanilla", "QQQ", "masked_v2", "cross_protocol_sequence", "sensitivity", "non-equivalent sequence and protocol"),
     ("nav_wtmaskv2_qqqvan", "nav15", "WT", "masked_v2", "QQQ", "vanilla", "cross_protocol_sequence", "sensitivity", "non-equivalent sequence and protocol"),
     ("nav_wtmaskv2_qqqmask", "nav15", "WT", "masked_v2", "QQQ", "masked", "cross_protocol_sequence", "sensitivity", "non-equivalent masks and sequence"),
-    ("nav_wtnoifm_qqqvan", "nav15", "WT", "masked_v2_noIFM", "QQQ", "vanilla", "cross_protocol_sequence", "sensitivity", "non-equivalent masks and sequence"),
-    ("nav_wtnoifm_qqqmask", "nav15", "WT", "masked_v2_noIFM", "QQQ", "masked", "cross_protocol_sequence", "sensitivity", "non-equivalent masks and sequence"),
-    ("nav_wtnoifm_qqqmaskv2", "nav15", "WT", "masked_v2_noIFM", "QQQ", "masked_v2", "cross_protocol_sequence", "sensitivity", "non-equivalent masks and sequence"),
 ]
 
 COMPARISON_COLUMNS = [

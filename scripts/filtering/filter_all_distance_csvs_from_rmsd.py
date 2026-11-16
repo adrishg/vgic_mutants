@@ -210,6 +210,35 @@ def first_generated_trajectory_keys(
     return {key for _, key in selected[:limit]}
 
 
+def all_ok_3_trajectory_keys(
+    manifest_rows: list[dict[str, str]], manifest_keys: list[str],
+) -> set[str]:
+    """Select the converged suffix of every trajectory using the registered 3 Å rule."""
+    groups: dict[tuple[str, str], list[tuple[dict[str, str], str]]] = defaultdict(list)
+    for row, key in zip(manifest_rows, manifest_keys):
+        if true_value(row.get("is_base")):
+            continue
+        groups[(row.get("seed", ""), row.get("model_number", ""))].append((row, key))
+    selected: set[str] = set()
+    for trajectory in groups.values():
+        trajectory.sort(key=lambda item: numeric_sort_value(item[0].get("recycle_number")))
+        def numeric_or_nan(value: object) -> float:
+            try:
+                return float(str(value).strip())
+            except (TypeError, ValueError):
+                return float("nan")
+
+        passed = [
+            numeric_or_nan(row.get("rmsd_to_previous_available")) <= 3.0
+            and numeric_or_nan(row.get("aligned_coverage_to_previous")) >= 0.9
+            for row, _ in trajectory
+        ]
+        starts = [index for index in range(len(trajectory)) if all(passed[index:])]
+        if starts:
+            selected.update(key for _, key in trajectory[starts[0]:])
+    return selected
+
+
 def write_rows(path: Path, fields: list[str], rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -254,9 +283,11 @@ def process_pair(
     manifest_dupes = duplicate_counts(manifest_keys)
     distance_set, manifest_set = set(distance_keys), set(manifest_keys)
     all_ok_set = {key for key, row in zip(manifest_keys, manifest_rows) if true_value(row.get("all_ok"))}
+    all_ok_3_set = all_ok_3_trajectory_keys(manifest_rows, manifest_keys)
     earliest_set = {key for key, row in zip(manifest_keys, manifest_rows) if true_value(row.get("earliest_converged_selected"))}
     first_100_set = first_generated_trajectory_keys(manifest_rows, manifest_keys)
     all_ok_rows = [row for key, row in zip(distance_keys, distance_rows) if key in all_ok_set]
+    all_ok_3_rows = [row for key, row in zip(distance_keys, distance_rows) if key in all_ok_3_set]
     earliest_rows = [row for key, row in zip(distance_keys, distance_rows) if key in earliest_set]
     first_100_rows = [row for key, row in zip(distance_keys, distance_rows) if key in first_100_set]
     unmatched = [(index, key, row) for index, (key, row) in enumerate(zip(distance_keys, distance_rows), 2) if key not in manifest_set]
@@ -273,8 +304,14 @@ def process_pair(
     all_name, earliest_name, first_100_name = output_names(distance_path)
     all_output, earliest_output = out_dir / all_name, out_dir / earliest_name
     first_100_output = out_dir / first_100_name
+    base = distance_path.stem[:-4] if distance_path.stem.endswith("_all") else distance_path.stem
+    all_ok_3_output = distance_path.parent / f"{base}_all_ok_rmsd_3A.csv"
     if status == "matched" and not dry_run:
         write_rows(all_output, distance_fields, all_ok_rows)
+        # Preserve valid vanilla files already materialized in the external
+        # package (some are intentionally symlinked to the local HF cache).
+        if not all_ok_3_output.exists() and not all_ok_3_output.is_symlink():
+            write_rows(all_ok_3_output, distance_fields, all_ok_3_rows)
         write_rows(earliest_output, distance_fields, earliest_rows)
         write_rows(first_100_output, distance_fields, first_100_rows)
         if any(len(rows) > len(distance_rows) for rows in (all_ok_rows, earliest_rows, first_100_rows)):

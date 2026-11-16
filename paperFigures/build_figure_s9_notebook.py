@@ -16,7 +16,7 @@ nb["metadata"] = {
 nb["cells"] = [
     nbf.v4.new_markdown_cell(r"""# Supplementary Figure S9 — does masking expose the Kv2.1 E423–N179 shift in WT?
 
-This analysis asks whether the E423–N179 pore–VSD/S6 displacement observed in masked L403A predictions is mutation-specific or is also sampled by masked WT. The primary comparison is **WT masked versus L403A masked**, with WT and L403A vanilla ensembles retained as the baseline context.
+This analysis asks whether the E423–N179 pore–VSD/S6 displacement observed in masked L403A predictions is mutation-specific or is also sampled by masked WT. The primary comparison is **WT masked versus L403A masked**, with WT and L403A vanilla ensembles retained as the baseline context. The current 50% masked cohorts are analyzed at the explicit convergence-qualified all_ok_rmsd_3A level; structural/interface QC is not silently implied.
 
 The experimentally defined shifted state is an **elongated** E423–N179 distance. Its threshold (12.841 Å) is the midpoint between the longest 8SD3 WT subunit and the shortest elongated 8SDA L403A subunit. Because chain labels in a homotetramer can rotate, subunit distances are ranked within each structure before the asymmetry pattern is compared.
 
@@ -37,6 +37,11 @@ if not (repo_root / 'shared').is_dir():
 sys.path.insert(0, str(repo_root))
 
 from shared.distribution_statistics import parse_trajectory_metadata
+from shared.data_access import resolve
+from shared.dataset_selection import (
+    distance_csv_options, load_selected_distance_csv,
+    kv21_active_masked_distance_path,
+)
 from shared.plotting import (
     KV21_PALETTE, apply_kv21_style, experimental_reference_style,
 )
@@ -48,11 +53,20 @@ TAB_DIR = repo_root / 'docs/tables/supplementary_figure_s9'
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 TAB_DIR.mkdir(parents=True, exist_ok=True)
 
+ORIGINAL_PATHS = {
+    ('WT', 'vanilla'): Path('kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2test_distances_all.csv'),
+    ('WT', 'masked'): kv21_active_masked_distance_path(repo_root, 'WT'),
+    ('L403A', 'vanilla'): Path('kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all.csv'),
+    ('L403A', 'masked'): kv21_active_masked_distance_path(repo_root, 'L403A'),
+}
 DATASETS = {
-    ('WT', 'vanilla'): repo_root / 'kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2test_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv',
-    ('WT', 'masked'): repo_root / 'kv21/dataDistances/26-02-11_Kv2.1_wt_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv',
-    ('L403A', 'vanilla'): repo_root / 'kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv',
-    ('L403A', 'masked'): repo_root / 'kv21/dataDistances/26-02-11_Kv2.1_l403a_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv',
+    key: load_selected_distance_csv(
+        f'{key[0]} {key[1]}',
+        distance_csv_options(repo_root, path, 'kv21', key[0], key[1]),
+        'all_ok_3',
+        fallback_to_all=False,
+    )
+    for key, path in ORIGINAL_PATHS.items()
 }
 DISTANCE_COLUMNS = [f'CA_CA_{chain}_GLU425_CA-{chain}_ASN181_CA' for chain in 'ABCD']
 GROUP_ORDER = [('WT', 'vanilla'), ('WT', 'masked'), ('L403A', 'vanilla'), ('L403A', 'masked')]
@@ -68,22 +82,56 @@ GROUP_COLORS = {
 }
 BASE_SEED = 20260824
 BOOTSTRAP_REPLICATES = 10_000"""),
-    nbf.v4.new_markdown_cell("""## Final analysis cohorts and experimental definition
+    nbf.v4.new_markdown_cell("""## Convergence-qualified cohorts and experimental definition
 
-All four ensembles use the same final convergence, tetramer/interface, and alignment-QC level. The CSV residue labels are offset by +2 relative to experimental numbering; `GLU425–ASN181` therefore reports experimental E423–N179."""),
-    nbf.v4.new_code_cell("""threshold_table = pd.read_csv(
-    repo_root / 'analysis/statistics_revision/seed_block/l403a_experimental_threshold_derivation.csv'
-)
-SHIFT_THRESHOLD = float(threshold_table.derived_threshold_A.iloc[0])
-experimental_ranked = {
-    structure: np.sort(part.E423_N179_CA_distance_A.to_numpy(float))
-    for structure, part in threshold_table.groupby('structure')
+All four ensembles use the explicit convergence-qualified all_ok_rmsd_3A tables. The CSV residue labels are offset by +2 relative to experimental numbering; GLU425–ASN181 therefore reports experimental E423–N179. The structural/interface-QC reconciliation is uploaded separately and is not mixed into this figure."""),
+    nbf.v4.new_code_cell("""def experimental_ca_distances(path):
+    coordinates = {}
+    for line in path.read_text().splitlines():
+        if not line.startswith('ATOM') or line[12:16].strip() != 'CA':
+            continue
+        residue, chain = line[17:20].strip(), line[21].strip()
+        try:
+            number = int(line[22:26])
+        except ValueError:
+            continue
+        if (residue, number) not in {('GLU', 423), ('ASN', 179)}:
+            continue
+        coordinates[(chain, residue, number)] = np.array([
+            float(line[30:38]), float(line[38:46]), float(line[46:54])
+        ])
+    return {
+        chain: float(np.linalg.norm(
+            coordinates[(chain, 'GLU', 423)] - coordinates[(chain, 'ASN', 179)]
+        ))
+        for chain in 'ABCD'
+    }
+
+experimental_values = {
+    '8SD3': experimental_ca_distances(repo_root / 'kv21/experimental/8SD3.pdb'),
+    '8SDA': experimental_ca_distances(repo_root / 'kv21/experimental/8SDA.pdb'),
 }
+wt_max = max(experimental_values['8SD3'].values())
+shifted_values = sorted(value for value in experimental_values['8SDA'].values() if value > wt_max)
+if len(shifted_values) != 2:
+    raise ValueError(f'Expected two 8SDA distances above the WT maximum; got {shifted_values}')
+SHIFT_THRESHOLD = (wt_max + shifted_values[0]) / 2
+experimental_ranked = {
+    structure: np.sort(list(values.values()))
+    for structure, values in experimental_values.items()
+}
+pd.DataFrame([
+    {'structure': structure, 'chain': chain, 'E423_N179_CA_distance_A': value,
+     'derived_threshold_A': SHIFT_THRESHOLD}
+    for structure, values in experimental_values.items()
+    for chain, value in values.items()
+]).to_csv(TAB_DIR / 'l403a_experimental_threshold_derivation.csv', index=False)
+print(f'Experiment-anchored threshold: {SHIFT_THRESHOLD:.6f} Å')
 
 frames = {}
 audit_rows = []
-for key, path in DATASETS.items():
-    frame = pd.read_csv(path, usecols=['pdb_file', *DISTANCE_COLUMNS])
+for key, source in DATASETS.items():
+    frame = source[['pdb_file', *DISTANCE_COLUMNS]].copy()
     frame = parse_trajectory_metadata(frame)
     frame[DISTANCE_COLUMNS] = frame[DISTANCE_COLUMNS].apply(pd.to_numeric, errors='coerce')
     if frame[DISTANCE_COLUMNS].isna().any().any():
@@ -98,7 +146,8 @@ for key, path in DATASETS.items():
         frame[f'exactly_{number}_shifted'] = frame.shifted_subunits.eq(number).astype(float)
     frames[key] = frame
     audit_rows.append({
-        'sequence': key[0], 'protocol': key[1], 'source_path': str(path.relative_to(repo_root)),
+        'sequence': key[0], 'protocol': key[1],
+        'source_path': str(source.attrs.get('source_path', 'in-memory selected table')),
         'snapshot_rows': len(frame), 'retained_seeds': frame.seed.nunique(),
         'retained_seed_model_trajectories': frame[['seed', 'model_number']].drop_duplicates().shape[0],
         'threshold_A': SHIFT_THRESHOLD,
@@ -366,9 +415,9 @@ print('Saved:', png.relative_to(repo_root))
 print('Saved:', pdf.relative_to(repo_root))"""),
     nbf.v4.new_markdown_cell("""## Take-home message
 
-The elongated E423–N179 state is **not specific to L403A**. Targeted masking makes it appreciable in both sequence backgrounds, while both vanilla ensembles remain near zero. In the final matched-QC cohorts, WT masked has a higher absolute shifted-state prevalence than L403A masked (~14.4% versus ~9.8%), and its maximum-distance distribution is ~0.19 Å higher.
+The elongated E423–N179 state is **not specific to L403A** if it is present in both current masked convergence-qualified cohorts. The exact prevalence, uncertainty interval, and maximum-distance contrast are reported in `e423_n179_group_summary.csv` and `e423_n179_seed_bootstrap_contrasts.csv`; no percentages are hard-coded into this notebook.
 
-The relative continuous response to masking is nevertheless slightly larger from the lower L403A vanilla baseline: the maximum-distance masking effect is ~0.95 Å in L403A and ~0.82 Å in WT. Thus, masking broadens access to the elongated coordinate in both proteins, but this single coordinate does not support selective stabilization of the thresholded state by L403A.
+The relative continuous response to masking is evaluated from the same current tables. Thus, masking can be interpreted as broadening access to the elongated coordinate only to the extent supported by the reported bootstrap contrast; this single coordinate does not by itself support selective stabilization of the thresholded state by L403A.
 
 Finally, the predicted threshold-positive tail is predominantly a **four-subunit elongation** in both masked ensembles. Exactly two shifted subunits—the asymmetric pattern in experimental 8SDA—remain rare. The supplemental interpretation should therefore emphasize increased sampling of an elongated pore–VSD/S6 coordinate, not full recovery of the mutation-specific experimental conformer."""),
 ]

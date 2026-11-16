@@ -8,6 +8,8 @@ import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+from shared.data_access import resolve
+from shared.dataset_selection import kv21_active_masked_distance_path
 
 DATA_DIR = Path("kv21/dataDistances")
 
@@ -15,8 +17,7 @@ FILES = {
     "vanilla": DATA_DIR
     / "26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
 
-    "masked": DATA_DIR
-    / "26-02-11_Kv2.1_l403a_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
+    "masked": kv21_active_masked_distance_path(REPO_ROOT, "L403A"),
 }
 
 # E423-N179 in the figure corresponds to GLU425-ASN181 in these CSVs.

@@ -33,13 +33,15 @@ The question here is simple: do G402S and G406R make DI-S6 slide along DIV-S6, o
 
 The primary metric is a **whole-interface nearest-partner register**, not a single mutation-site distance. For every structure, residues 400–408 in DI-S6 are matched to their nearest residue among DIV-S6 residues 1519–1535. The WT-vanilla modal map defines the reference packing register. The mutation site is excluded from the aggregate score so that the larger Arg side chain cannot by itself create an apparent helix slide.
 
-The corrected July G406R tables are used because they contain complete shortest-heavy-atom and Cα matrices. The cross-condition register analysis uses shortest heavy-atom distances while excluding the mutation site from aggregate sliding scores; severe R406 overlap is tracked separately. Cα completeness is audited independently as a backbone-level safeguard."""),
+The corrected July G406R vanilla table is used because it contains complete shortest-heavy-atom and Cα matrices. Only the corrected WT masked candidate is currently available; legacy masked mutant tables are deliberately not substituted. The cross-condition register analysis uses shortest heavy-atom distances while excluding the mutation site from aggregate sliding scores; severe R406 overlap is tracked separately. Cα completeness is audited independently as a backbone-level safeguard."""),
 code("""from pathlib import Path
 import csv, re, math, os
 from collections import Counter, defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+from shared.data_access import resolve
+from shared.dataset_selection import cav12_active_masked_distance_path
 
 ROOT = Path.cwd().resolve()
 if ROOT.name == 'cav12': ROOT = ROOT.parent
@@ -54,11 +56,9 @@ COLORS = {
 }
 CONDITIONS = [
  ('WT','vanilla','26-02-10_Cav12_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv'),
- ('WT','masked','26-02-10_Cav12_wt_maskedAF2_distances_all_ok_rmsd_3A.csv'),
+ ('WT','masked',str(resolve(cav12_active_masked_distance_path(ROOT, 'WT')))),
  ('G402S','vanilla','26-02-10_Cav12_g402s_vanillaAF2_distances_all_ok_rmsd_3A.csv'),
- ('G402S','masked','26-02-10_Cav12_g402s_maskedAF2_distances_all_ok_rmsd_3A.csv'),
  ('G406R','vanilla','26-07-25_Cav1.2_g406r_vanillaAF2_distances_all_ok_rmsd_3A.csv'),
- ('G406R','masked','26-07-25_Cav1.2_g406r_maskedAF2_distances_all_ok_rmsd_3A.csv'),
 ]
 DI = list(range(400,409)); DIV = list(range(1519,1536))
 

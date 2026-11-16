@@ -17,13 +17,19 @@ ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
 from shared.distribution_statistics import parse_trajectory_metadata, exact_common_distance_columns, stable_seed
 from shared.plotting import apply_kv21_style, KV21_PALETTE
+from shared.data_access import resolve
+from shared.dataset_selection import (
+    distance_csv_options,
+    kv21_active_masked_distance_path,
+    load_selected_distance_csv,
+)
 
 DATA=ROOT/'kv21'/'dataDistances'
 OUT=ROOT/'kv21'/'dataExtra'/'conformation_analysis'/'all_distance_sampling'
 FIG=OUT/'figures'; TAB=OUT/'tables'; FIG.mkdir(parents=True,exist_ok=True); TAB.mkdir(parents=True,exist_ok=True)
 PATHS={
- 'vanilla':DATA/'26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv',
- 'masked':DATA/'26-02-11_Kv2.1_l403a_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv'}
+ 'vanilla': 'kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv',
+ 'masked': kv21_active_masked_distance_path(ROOT, 'L403A')}
 DEPTHS=[4,8,12,16,20,'Full QC']; FOCAL_DEPTH=20; EPS=1e-9
 
 def distance_chain_pair(column):
@@ -39,7 +45,17 @@ def is_intrachain_distance(column):
     return pair is not None and pair[0]==pair[1]
 
 def load():
-    frames={p:parse_trajectory_metadata(pd.read_csv(path,low_memory=False)) for p,path in PATHS.items()}
+    vanilla = pd.read_csv(resolve(PATHS['vanilla']), low_memory=False)
+    masked_options = distance_csv_options(
+        ROOT, PATHS['masked'], 'Kv21', 'L403A', 'masked'
+    )
+    masked = load_selected_distance_csv(
+        'Kv2.1 L403A masked', masked_options, 'all_ok_3', fallback_to_all=False
+    )
+    frames={
+        'vanilla': parse_trajectory_metadata(vanilla),
+        'masked': parse_trajectory_metadata(masked),
+    }
     shared=exact_common_distance_columns(frames['vanilla'],frames['masked'])
     cols=[column for column in shared if is_intrachain_distance(column)]
     if len(cols)!=546:

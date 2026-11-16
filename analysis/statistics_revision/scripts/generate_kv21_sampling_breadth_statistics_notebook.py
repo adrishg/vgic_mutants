@@ -32,7 +32,8 @@ Three analyses are kept separate:
 2. **Full-QC S6 breadth (WT, L403A, F412L):** trajectory-block bootstrap, keeping all retained recycles from a `(seed, model)` trajectory together.
 3. **Full-QC RMSF (WT, L403A, F412L):** trajectory-block bootstrap from the aligned Cα coordinate arrays.
 
-Important provenance note: the current executable, chain-label-invariant S6 estimator does **not** reproduce the historical manuscript point values 3.50, 2.08, and 1.92. Its results below are therefore explicitly labeled **revised current estimates**, not confidence intervals for those historical values.
+The chain-label-invariant S6 estimator below reports the current registered-cohort estimates. Its
+intervals describe uncertainty for that estimator and its declared analysis cohort.
 """),
     code(r"""
 from pathlib import Path
@@ -120,7 +121,8 @@ print(f"Stored S6 bootstrap replicates: {len(s6_reps):,}")
     markdown(r"""
 ### S6 interpretation guardrail
 
-The percentile intervals quantify uncertainty for the **revised current estimator shown here**. They must not be attached to the historical 3.50/2.08/1.92 values because those point estimates are not reproduced by the current source tables and executable selector. The representative-only result is a sensitivity analysis, not a replacement estimand.
+The percentile intervals quantify uncertainty for the estimator shown here. The representative-only
+result is a sensitivity analysis, not a replacement estimand.
 """),
     markdown(r"""
 ## 3. RMSF masked-minus-vanilla differences

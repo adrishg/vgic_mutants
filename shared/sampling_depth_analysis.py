@@ -82,10 +82,20 @@ def first_nominal_trajectory_cohort(
 def latest_qc_trajectory_representatives(frame: pd.DataFrame) -> pd.DataFrame:
     """Select the latest final-QC recycle for each seed/model trajectory."""
     keys = _trajectory_keys(frame)
+    names = frame["pdb_file"].astype(str)
     recycle = pd.to_numeric(
-        frame["pdb_file"].astype(str).str.extract(_RECYCLE, expand=False),
+        names.str.extract(_RECYCLE, expand=False),
         errors="coerce",
     )
+    # The current Kv2.1 distance export is one row per retained model and
+    # intentionally omits recycle suffixes. Treat those rows as the single
+    # retained snapshot of their trajectory; explicit .rN rows retain their
+    # recorded recycle number.
+    missing_recycle = recycle.isna()
+    if missing_recycle.any():
+        no_suffix = names[missing_recycle].str.endswith(".pdb")
+        if no_suffix.all():
+            recycle.loc[missing_recycle] = 1
     if keys.isna().any(axis=None) or recycle.isna().any():
         bad = frame.loc[keys.isna().any(axis=1) | recycle.isna(), "pdb_file"].head().tolist()
         raise ValueError(f"Could not parse trajectory/recycle identity: {bad}")

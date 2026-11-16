@@ -80,11 +80,23 @@ def load_primary_profile(repo_root: str | Path, channel: str) -> tuple[pd.DataFr
     profile_root = Path(repo_root) / channel / "dataRMSF" / "profiles"
     candidates = [profile_root / name for name in PROFILE_FILES[channel]]
     path = next((candidate for candidate in candidates if candidate.is_file()), candidates[0])
-    if not path.is_file():
-        raise FileNotFoundError(
-            "Primary RMSF profile not found; checked: " + ", ".join(map(str, candidates))
-        )
-    data_path = resolve_local_lfs_object(path, repo_root)
+    if path.is_file():
+        data_path = resolve_local_lfs_object(path, repo_root)
+    else:
+        data_path = None
+        for name in PROFILE_FILES[channel]:
+            try:
+                data_path = resolve_local_lfs_object(
+                    Path(channel) / "dataRMSF" / "profiles" / name,
+                    repo_root,
+                )
+                break
+            except (FileNotFoundError, RuntimeError):
+                continue
+        if data_path is None:
+            raise FileNotFoundError(
+                "Primary RMSF profile not found; checked: " + ", ".join(map(str, candidates))
+            )
     frame = pd.read_csv(data_path)
     schema = detect_profile_schema(frame, channel)
     return frame, schema, path

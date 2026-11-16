@@ -52,9 +52,6 @@ def _assert_controlled_differences(masks: dict[str, set[int]]) -> None:
         "cav12 G406R minus WT": (
             masks["cav12_g406r"] - masks["cav12_wt_common"], parse_ranges("402-406")
         ),
-        "cav12 G490R minus WT": (
-            masks["cav12_g490r"] - masks["cav12_wt_common"], parse_ranges("485-495")
-        ),
     }
     for label, (observed, expected) in checks.items():
         if observed != expected:
@@ -63,7 +60,7 @@ def _assert_controlled_differences(masks: dict[str, set[int]]) -> None:
             )
     if masks["nav15_v2_noIFM"] & parse_ranges("1164-1176"):
         raise AssertionError("nav15_v2_noIFM unexpectedly masks the IFM block")
-    for name, position in (("cav12_g402s", 402), ("cav12_g406r", 406), ("cav12_g490r", 490)):
+    for name, position in (("cav12_g402s", 402), ("cav12_g406r", 406)):
         if position not in masks[name]:
             raise AssertionError(f"{name}: mutation position {position} is not directly masked")
 

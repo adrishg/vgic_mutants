@@ -22,14 +22,12 @@ class MaskTests(unittest.TestCase):
         self.assertEqual(set(table.loc[table.directly_masked, "raw_residue_number"]), {2, 4})
 
     def test_authoritative_checkpoint_counts(self):
-        kv21 = parse_ranges("288-328,370-384,401-417")
-        self.assertEqual(len(kv21), 73)
+        kv21 = parse_ranges("256-260,276-280,288-328,370-417")
+        self.assertEqual(len(kv21), 99)
         wt = parse_ranges("127,160,163,173,199,213,235-287,401,407-412,557,570,594,602,607,617-671,750,753,755,757,937,947,993,1013-1068,1181,1185,1187,1189,1242,1275,1285,1301,1307,1317,1369-1426,1519,1521-1522,1524,1527,1533")
         g402s = wt | parse_ranges("397-400,402-406")
         g406r = wt | parse_ranges("402-406")
-        g490r = wt | parse_ranges("485-495")
-        self.assertEqual([len(x) for x in (wt, g402s, g406r, g490r)], [263, 272, 268, 274])
+        self.assertEqual([len(x) for x in (wt, g402s, g406r)], [263, 272, 268])
         self.assertEqual(g402s - wt, parse_ranges("397-400,402-406"))
         self.assertEqual(g406r - wt, parse_ranges("402-406"))
-        self.assertEqual(g490r - wt, parse_ranges("485-495"))
-        self.assertTrue(402 in g402s and 406 in g406r and 490 in g490r)
+        self.assertTrue(402 in g402s and 406 in g406r)

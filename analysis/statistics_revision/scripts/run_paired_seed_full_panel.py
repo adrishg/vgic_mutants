@@ -80,7 +80,6 @@ def mask_id_for_spec(spec) -> str:
     mapping = {
         ("nav15", "WT", "masked"): "nav15_standard",
         ("nav15", "WT", "masked_v2"): "nav15_v2",
-        ("nav15", "WT", "masked_v2_noIFM"): "nav15_v2_noIFM",
         ("nav15", "QQQ", "masked"): "nav15_standard_plus_IFM",
         ("nav15", "QQQ", "masked_v2"): "nav15_v2",
         ("cav12", "WT", "masked"): "cav12_wt_common",

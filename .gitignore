@@ -10,6 +10,8 @@
 *.csv.gz
 *.tsv
 !docs/*_REGISTRY.tsv
+!analysis/active_masked_cohorts.tsv
+!analysis/kv21_active_masked_cohort.tsv
 *.npy
 *.npz
 *.h5ad

@@ -17,6 +17,12 @@ import pandas as pd
 import seaborn as sns
 
 from shared.experimental_overlays import experimental_rows
+from shared import data_access
+from shared.dataset_selection import (
+    cav12_active_masked_distance_path,
+    kv21_active_masked_distance_path,
+    nav15_active_masked_distance_path,
+)
 from shared.plotting import (
     CAV12_PALETTE,
     KV21_PALETTE,
@@ -123,7 +129,7 @@ def paper_configs(repo_root: str | Path):
         "Kv2.1": {
             "condition": "WT",
             "vanilla": root / "kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2test_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-            "masked": root / "kv21/dataDistances/26-02-11_Kv2.1_wt_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+            "masked": root / kv21_active_masked_distance_path(root, "WT"),
             "colors": (KV21_PALETTE["WT_VAN"], KV21_PALETTE["WT_HM"]),
             "references": ("8SD3:", "9O10:", "9O11:", "9O12:", "9O13:"),
         },
@@ -131,14 +137,14 @@ def paper_configs(repo_root: str | Path):
             "condition": "WT",
             "protocol_note": "targeted mask v2",
             "vanilla": root / "nav15/dataDistances/26-07-27_Nav15_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-            "masked": root / "nav15/dataDistances/26-07-27_Nav15_wt_maskedv2_AF2_distances_all_ok_rmsd_3A.csv",
+            "masked": root / nav15_active_masked_distance_path(root, "WT", "v2"),
             "colors": (NAV15_PALETTE["WT_VAN"], NAV15_PALETTE["WT_HM"]),
             "references": ("6UZ3:", "8VYJ:", "8VYK:"),
         },
         "Cav1.2": {
             "condition": "WT",
             "vanilla": root / "cav12/dataDistances/26-02-10_Cav12_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-            "masked": root / "cav12/dataDistances/26-02-10_Cav12_wt_maskedAF2_distances_all_ok_rmsd_3A.csv",
+            "masked": root / cav12_active_masked_distance_path(root, "WT"),
             "colors": (CAV12_PALETTE["WT_VAN"], CAV12_PALETTE["WT_HM"]),
             "references": ("8HLP", "8WE6", "8FD7"),
         },
@@ -150,8 +156,13 @@ def load_paper_data(configs):
     for channel, config in configs.items():
         for protocol in ("vanilla", "masked"):
             path = config[protocol]
-            if not path.is_file():
+            try:
+                resolved = data_access.resolve(path)
+            except (FileNotFoundError, data_access.DataUnavailable) as error:
+                raise FileNotFoundError(f"{channel} {protocol}: {path}") from error
+            if not resolved.is_file():
                 raise FileNotFoundError(f"{channel} {protocol}: {path}")
+            config[protocol] = resolved
         loaded[channel] = {
             "vanilla": pd.read_csv(config["vanilla"]),
             "masked": pd.read_csv(config["masked"]),

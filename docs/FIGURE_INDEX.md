@@ -1,11 +1,11 @@
 # Figure index
 
-## Reviewer-revised main panels
+## Publication main panels
 
-- Figure 4: `analysis/statistics_revision/figures/Figure4_Kv21_L403A_four_condition_revision.{png,pdf}`. Includes WT vanilla, WT masked, L403A vanilla, L403A masked, and the 0–4 elongated-interface distribution. Source data are in `analysis/statistics_revision/paired_seed_v2/source_data/figure4_*`.
-- Figure 5 cleaned F412L panel: `analysis/statistics_revision/figures/Figure5_F412L_mutation_site_cleaned.{png,pdf}`. Partner labels retain chain identity. Source data are in `paired_seed_v2/source_data/figure5_*`.
+- Figure 4: `analysis/statistics_revision/figures/Figure4_Kv21_L403A_four_condition.{png,pdf}`. Includes WT vanilla, WT masked, L403A vanilla, L403A masked, and the 0–4 elongated-interface distribution. Source data are in `analysis/statistics_revision/paired_seed_v2/source_data/figure4_*`.
+- Figure 5 F412L panel: `analysis/statistics_revision/figures/Figure5_F412L_mutation_site_cleaned.{png,pdf}`. Partner labels retain chain identity. Source data are in `paired_seed_v2/source_data/figure5_*`.
 - Figure 6 mask/reference metadata: `analysis/statistics_revision/tables/Figure6_mask_and_reference_markers.tsv`.
-- Figure 7: `analysis/statistics_revision/figures/Figure7_Cav12_matched_G402S_R406_screen_revision.{png,pdf}`. Panel D uses all 17 atom-matched position-402 Cα pairs; panel E uses the coordinate-derived side-chain-heavy R406 screen and reports conditional contact numerators and denominators.
+- Figure 7: `analysis/statistics_revision/figures/Figure7_Cav12_matched_G402S_R406_screen.{png,pdf}`. Panel D uses all 17 atom-matched position-402 Cα pairs; panel E uses the coordinate-derived side-chain-heavy R406 screen and reports conditional contact numerators and denominators.
 - Cross-channel global clashscore: `analysis/statistics_revision/figures/cross_channel_clashscore_absolute_means.{png,pdf}`.
 
 The shared sequence/protocol palette is listed in `palette.txt` and implemented
@@ -60,8 +60,8 @@ Primary notebooks:
 only as an L403A-like state comparator because no mutation-matched experimental F412L structure is
 available.
 
-## High-resolution exports
+## Figure outputs
 
-Notebook figures are also mirrored outside the repository under
-`vgci_mutants_writing/figures/<channel>/`. These exports are presentation products; the notebooks
-and shared plotting functions remain the reproducible source.
+The executed notebooks are the reproducible source for the publication figures. Rendered images and
+source tables are generated from those notebooks and are intentionally kept out of Git when they are
+available in the companion data repository.

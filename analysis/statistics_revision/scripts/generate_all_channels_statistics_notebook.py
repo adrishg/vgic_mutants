@@ -124,7 +124,9 @@ print(f'RMSF region rows: {len(rmsf_compact)}; topology rows: {len(rmsf_topology
 cells.append(nbf.v4.new_markdown_cell("""
 # Additional reproducible uncertainty analyses supported for Kv2.1
 
-The following cells are copied from the dedicated Kv2.1 uncertainty notebook. They do not imply that an S6 or First100 estimator was available for CaV1.2 or Nav1.5. The current executable S6 estimator also does not reproduce the historical 3.50/2.08/1.92 values, so its intervals are labeled revised estimates.
+The following cells are copied from the dedicated Kv2.1 uncertainty notebook. They do not imply that
+an S6 or reduced-depth estimator was available for CaV1.2 or Nav1.5. The executable S6 estimator
+reports intervals from the current registered cohorts.
 """.strip()))
 
 # The dedicated notebook's cells establish their own repository root and imports.

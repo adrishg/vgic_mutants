@@ -4,9 +4,8 @@
 The primary requested rule uses every non-hydrogen atom in ARG406 and the
 partner residue. A side-chain-heavy rule is emitted as a prespecified
 sensitivity because the all-heavy rule includes the covalent ARG406-GLU407
-peptide bond. Results from this script are new coordinate-derived analyses;
-they are not presented as recovery of the historical ``shortest_ARG406-*``
-implementation.
+peptide bond. Results from this script are coordinate-derived analyses using
+the declared side-chain atom rule.
 """
 
 from __future__ import annotations
@@ -242,9 +241,7 @@ def summarize(records: pd.DataFrame) -> pd.DataFrame:
             "screen_definition": (
                 "all 19 ARG406-partner minimum distances >= 2.0 A"
             ),
-            "historical_recovery_status": (
-                "new coordinate-derived analysis; not recovery of historical columns"
-            ),
+            "coordinate_screen_status": "coordinate-derived analysis",
         }
         rows.append({**base, "partner_residue": "screen_only"})
         for partner in ("ASP1528", "ASP1533"):

@@ -456,7 +456,7 @@ def align_manifest_shard(
     npz_path = output_dir / f"aligned_part_{task_id:04d}.npz"
     metadata_path = output_dir / f"aligned_part_{task_id:04d}_metadata.csv"
     if (npz_path.exists() or metadata_path.exists()) and not overwrite:
-        raise FileExistsError(f"Shard output exists for task {task_id}; use --overwrite or --resume in the Slurm wrapper")
+        raise FileExistsError(f"Shard output exists for task {task_id}; use --overwrite to replace it")
 
     manifest = pd.read_csv(manifest_path)
     selected = manifest.loc[manifest["manifest_index"] % task_count == task_id].copy()

@@ -147,7 +147,6 @@ additional variability is localized and experimentally meaningful.
 │   └── experimental/
 ├── docs/
 │   ├── FIGURE_INDEX.md
-│   ├── audits/
 │   └── workflows/
 ├── shared/
 │   ├── dataset_selection.py
@@ -177,12 +176,11 @@ The root contains only this project overview. Supporting documentation is groupe
 - [Figure and notebook index](docs/FIGURE_INDEX.md)
 - [Experimental-comparison RMSD workflow](docs/workflows/RMSD_WORKFLOW.md)
 - [Production A3M provenance](docs/workflows/A3M_PROVENANCE.md)
-- [Local MolProbity notebooks, audit, and execution](docs/workflows/MOLPROBITY_ANALYSIS.md)
-- [Nav1.5 retrospective distance audit](docs/audits/NAV15_DISTANCE_RETROSPECTIVE_AUDIT.md)
+- [Local MolProbity analysis and execution](docs/workflows/MOLPROBITY_ANALYSIS.md)
+- [Current analysis limitations](docs/KNOWN_ISSUES.md)
 
-Operational instructions and validation records remain beside the scripts they document. In
-particular, the channel-specific cluster packages retain their own `README.md` and `VALIDATION.md`
-files so that each package remains self-contained when transferred to the cluster.
+Analysis implementation notes remain beside the scripts they document. The public repository does not
+include prediction launchers, cluster submission files, or private filesystem paths.
 
 ## Dataset conventions
 
@@ -272,9 +270,7 @@ This repository keeps the analysis code, the convergence manifests, the statisti
 published figures.
 
 Nothing needs to be downloaded in advance. `shared/data_access.py` resolves a data path against the
-working tree first, then a local cache, and fetches from the dataset only when a file is absent. A file
-is retrieved once and read from the cache afterwards, so a notebook run offline after its first
-execution behaves as though the tables were local.
+working tree first, then a local cache, and fetches from the dataset only when a file is absent.
 
 ```python
 from shared.data_access import resolve
@@ -282,13 +278,7 @@ from shared.data_access import resolve
 frame = pd.read_csv(resolve("kv21/dataDistances/26-02-11_Kv2.1_wt_maskedAF2_distances_all.csv"))
 ```
 
-Two environment variables adjust this. `VGIC_DATA_ROOT` points at an existing complete copy, which
-suppresses downloading entirely and is the setting to use on a cluster. `VGIC_OFFLINE` forbids network
-access, so a missing file raises rather than being fetched.
-
-The regeneration scripts under `scripts/filtering/` are the exception. They walk whole directories to
-rebuild the QC tiers and therefore need a complete local copy rather than files fetched one at a time;
-run them with `VGIC_DATA_ROOT` set, or on the machine that holds the data.
+For a fully local copy, set `VGIC_DATA_ROOT` to the directory containing the downloaded dataset.
 
 ## Running the notebooks
 
@@ -309,17 +299,17 @@ Recommended order:
    `Kv21_WT_mutants_RMSD_comparison.ipynb` for the cross-condition view.
 6. For Nav1.5, run the IFM-latching notebook after the main channel analysis.
 
-The root-level `SamplingDepth_AllOK3_vs_First100.ipynb` is a sampling-depth sensitivity analysis. It
-compares each complete final-QC ensemble with a deterministic 100-trajectory subset drawn from that
-same retained ensemble. It therefore estimates what the apparent distributions might have looked like
-with shallower sampling; it is not a chronological comparison or an independent biological replicate.
+The root-level `SamplingDepth_AllOK3_vs_First100.ipynb` provides the deterministic reduced-depth
+sensitivity used for Supplementary Figure S8. It compares each complete final-QC ensemble with a
+fixed subset of 20 nominal seed labels and five AF2 model parameterizations per label. This is a
+sampling-depth sensitivity, not an independent biological replicate.
 
 `paperFigures/Figure2B_CrossChannel_DistanceSampling.ipynb` builds the matched WT manuscript panels comparing
 regional vanilla and masked distance distributions across all three channels. It exports a main figure
 with intracellular-gate, selectivity-filter, and voltage-sensor columns, plus nine identically sized
 individual panels.
-7. Review warnings for missing columns, rejected mappings, or unresolved experimental residues before
-   interpreting plots.
+Before interpreting plots, review warnings for missing columns, rejected mappings, or unresolved
+experimental residues.
 
 All presentation notebooks live directly inside their channel directory. The `dataDistances/`,
 `dataRMSD/`, and `dataRMSF/` directories contain inputs and generated tables or figures, while
@@ -328,13 +318,13 @@ Compact RMSD validation records, including model-join diagnostics and unmatched-
 stored under each channel's `dataRMSD/qc/` directory.
 
 Python modules imported directly by notebooks belong in `shared/`. Executable programs that generate,
-filter, validate, package, or regenerate data belong in `scripts/`. Cluster submission files and
-transfer archives are kept with the corresponding generation workflow rather than inside a channel's
-presentation or experimental-structure directory.
+filter, validate, package, or regenerate data belong in `scripts/`. Large model archives are distributed
+through the companion dataset rather than inside a channel's presentation or experimental-structure
+directory.
 
 The notebooks require Python with pandas, NumPy, Matplotlib, Seaborn, and Biopython.
 
-## Filtering and reproducibility
+## Data processing
 
 `scripts/filtering/refilter_distances_at_custom_rmsd.py` rebuilds filtered distance tables from stored RMSD manifests
 without modifying the original CSVs.
@@ -366,7 +356,3 @@ not guarantee that the selectivity-filter ring remains assembled.
 - The human Kv2.1 structures are state references and should not be treated as direct rat mutant matches.
 - RMSD clustering, seed-level summaries, and state occupancy estimates remain necessary before making
   strong claims about conformational-state sampling.
-
-## Citation
-
-Citation information will be added here.

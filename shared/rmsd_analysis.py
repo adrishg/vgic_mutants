@@ -55,21 +55,30 @@ def apply_kv21_rmsd_qc(
     # Named explicitly rather than discovered by glob: the allowlists are
     # published in the companion dataset and need not be present on disk.
     from . import data_access
+    from .dataset_selection import kv21_active_masked_distance_path
 
     allowlists: dict[tuple[str, str], set[str]] = {}
     for condition in ("wt", "l403a", "f412l"):
         for protocol in ("vanilla", "masked"):
-            stem = (
-                f"kv21/dataDistances/26-02-11_Kv2.1_{condition}_{protocol}AF2"
-                "_distances_all_ok_rmsd_3A_structural_interface"
-            )
             resolved = None
-            for suffix in ("_alignment_qc.csv", "_qc.csv"):
+            if protocol == "masked":
                 try:
-                    resolved = data_access.resolve(stem + suffix)
-                    break
+                    resolved = data_access.resolve(
+                        kv21_active_masked_distance_path(repo_root, condition)
+                    )
                 except (FileNotFoundError, data_access.DataUnavailable):
-                    continue
+                    resolved = None
+            else:
+                stem = (
+                    f"kv21/dataDistances/26-02-11_Kv2.1_{condition}_{protocol}AF2"
+                    "_distances_all_ok_rmsd_3A_structural_interface"
+                )
+                for suffix in ("_alignment_qc.csv", "_qc.csv"):
+                    try:
+                        resolved = data_access.resolve(stem + suffix)
+                        break
+                    except (FileNotFoundError, data_access.DataUnavailable):
+                        continue
             if resolved is None:
                 raise FileNotFoundError(
                     f"No Kv2.1 structural-interface allowlist for "

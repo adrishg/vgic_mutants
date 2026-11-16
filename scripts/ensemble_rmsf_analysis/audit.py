@@ -19,7 +19,15 @@ def main():
         tables.mkdir(parents=True, exist_ok=True)
         inventory = discover_rmsf_inputs(repo, channel)
         inventory.to_csv(tables / f"{channel}_input_inventory.csv", index=False)
-        profile, schema, path = load_primary_profile(repo, channel)
+        try:
+            profile, schema, path = load_primary_profile(repo, channel)
+        except FileNotFoundError as error:
+            # Kv2.1's registered corrected 73-residue run is still being
+            # generated on the cluster. Keep the completed channel audits
+            # usable instead of preventing NaV1.5/CaV1.2 tables from being
+            # materialized.
+            print(f"{channel}: skipped ({error})")
+            continue
         datasets = (
             profile.groupby(["dataset", "sequence_condition", "protocol"])
             .agg(rows=("raw_residue_number", "size"),

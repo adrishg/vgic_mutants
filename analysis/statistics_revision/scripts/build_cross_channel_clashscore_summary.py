@@ -47,9 +47,9 @@ def build_table() -> pd.DataFrame:
                 "cohort": "repository_QC",
                 "metric": "MolProbity clashscore",
                 "software": "Phenix MolProbity",
-                "software_version": "not recorded in historical export",
-                "invocation_options": "not recorded in historical export",
-                "hydrogen_treatment": "not recorded in historical export",
+                "software_version": "not recorded in source table",
+                "invocation_options": "not recorded in source table",
+                "hydrogen_treatment": "not recorded in source table",
                 "analyzed_cohort": (
                     f"{display} {sequence}: structures retained by the channel-specific "
                     "repository_QC manifest"
@@ -122,11 +122,11 @@ def write_report(table: pd.DataFrame, path: Path) -> None:
         "",
         "Masking was associated with higher global clashscore in most ensembles, with the largest change in Kv2.1 F412L. The L403A interval included zero. Absolute levels differed across channels, so the within-ensemble contrasts are the relevant protocol comparisons.",
         "",
-        "The Cav1.2 R406-centered overlap screen is a separate local endpoint. Passing that screen means none of the selected R406-centered legacy distances was below 2 Å; it does not validate the entire pocket. MolProbity clashscore summarizes serious overlaps across the whole model and does not identify the residue responsible.",
+        "The Cav1.2 R406-centered overlap screen is a separate local endpoint. Passing that screen means none of the selected R406-centered distances was below 2 Å; it does not validate the entire pocket. MolProbity clashscore summarizes serious overlaps across the whole model and does not identify the residue responsible.",
         "",
         "Source tables: `<channel>/dataExtra/molprobity/tables/contrasts.csv`.",
         "",
-        "The historical exports identify the program as Phenix MolProbity but do not record the software version, command-line/options, or whether hydrogens were added, retained, or optimized. Those fields are therefore reported as `not recorded` in the source table rather than reconstructed by assumption.",
+        "The source tables identify the program as Phenix MolProbity but do not record the software version, command-line/options, or whether hydrogens were added, retained, or optimized. Those fields are therefore reported as `not recorded` rather than reconstructed by assumption.",
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n")

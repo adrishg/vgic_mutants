@@ -49,9 +49,9 @@ nb.cells[7].source = (
 
 nb.cells[8].source = """## Take-home message
 
-F412L strongly samples the L403A-like elongated E423–N179 coordinate even without masking. The seed-balanced shifted-state prevalence is ~22.3% in F412L vanilla and ~38.2% in F412L masked, compared with ~0.15% and ~14.4% in WT vanilla and WT masked, respectively.
+F412L is evaluated against the same current convergence-qualified E423–N179 coordinate as WT. The exact seed-balanced shifted-state prevalence and uncertainty intervals are written to `e423_n179_group_summary.csv`; no legacy percentages are hard-coded into this notebook.
 
-Within the masked ensembles, F412L exceeds WT by ~23.8 percentage points and its seed-balanced maximum distance is ~1.32 Å larger. Masking further increases the shifted-state prevalence by ~15.9 percentage points in F412L, similar to the ~14.2-point increase in WT; the masking-by-F412L interaction for the thresholded fraction is small and its confidence interval includes zero. Thus, the large absolute F412L occupancy mainly reflects the F412L sequence background plus a broadly similar masking response.
+The masked-versus-WT contrast, the masking response, and the masking-by-F412L interaction are reported in `e423_n179_seed_bootstrap_contrasts.csv`. This keeps the specificity control tied to the current 50% inputs rather than to earlier dataset denominators.
 
 As in the L403A control, the threshold-positive population is dominated by four-subunit elongation rather than the two-subunit asymmetry of experimental 8SDA. E423–N179 elongation is therefore not unique to L403A and should be interpreted as a shared Kv2.1 conformational coordinate whose baseline accessibility is especially high in F412L—not as a mutation-specific reconstruction of 8SDA."""
 

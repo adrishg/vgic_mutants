@@ -18,6 +18,11 @@ import pandas as pd
 import seaborn as sns
 from Bio.PDB import PDBParser
 
+from shared import data_access
+from shared.dataset_selection import (
+    kv21_active_masked_distance_path,
+    kv21_active_rmsd_path,
+)
 from shared.rmsd_analysis import apply_kv21_rmsd_qc
 from shared.plotting import (
     KV21_PALETTE,
@@ -42,7 +47,9 @@ def _basename(series: pd.Series) -> pd.Series:
 
 def _all_ok3_basenames(repo_root: str | Path) -> set[str]:
     manifest = pd.read_csv(
-        Path(repo_root) / "kv21/dataRMSF/qc/kv21_all_ok3_selection_manifest.csv",
+        data_access.resolve(
+            "kv21/dataRMSF/qc/kv21_all_ok3_selection_manifest.csv"
+        ),
         usecols=["pdb_basename", "all_ok_3"],
     )
     return set(manifest.loc[manifest["all_ok_3"].fillna(False), "pdb_basename"])
@@ -51,7 +58,7 @@ def _all_ok3_basenames(repo_root: str | Path) -> set[str]:
 def load_nexus_rmsd(repo_root: str | Path) -> pd.DataFrame:
     """Load only the RMSD columns needed for the nexus analysis."""
     root = Path(repo_root)
-    source = root / "kv21/dataRMSD/Kv21_all_models_vs_8SD3_8SDA_RMSD_v2.csv"
+    source = data_access.resolve(kv21_active_rmsd_path(root, "F412L"))
     chain_columns = [
         f"{region.split('__', 1)[0]}__chain_{chain}__ca__core_aligned_rmsd_A"
         for region in REGIONS.values()
@@ -201,14 +208,19 @@ def contact_signature(repo_root: str | Path) -> tuple[pd.DataFrame, pd.DataFrame
     records = []
     for sequence_key, sequence_label in (("wt", "WT"), ("f412l", "F412L")):
         for protocol in ("vanilla", "masked"):
-            source = (
-                root
-                / "kv21/dataDistances"
-                / (
-                    f"26-02-11_Kv2.1_{sequence_key}_{protocol}AF2_distances_"
-                    "all_ok_rmsd_3A_structural_interface_alignment_qc.csv"
+            if protocol == "masked":
+                source = data_access.resolve(
+                    kv21_active_masked_distance_path(root, sequence_label)
                 )
-            )
+            else:
+                source = data_access.resolve(
+                    root
+                    / "kv21/dataDistances"
+                    / (
+                        f"26-02-11_Kv2.1_{sequence_key}_{protocol}AF2_distances_"
+                        "all_ok_rmsd_3A_structural_interface_alignment_qc.csv"
+                    )
+                )
             if not source.is_file():
                 raise FileNotFoundError(
                     f"Missing {sequence_label} {protocol} alignment-QC "

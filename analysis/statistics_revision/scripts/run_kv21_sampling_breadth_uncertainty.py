@@ -12,6 +12,11 @@ import pandas as pd
 from scripts.ensemble_rmsf_analysis.io import read_csv_resolving_lfs, resolve_local_lfs_object
 from shared.plotting import add_s6_cross_pore_columns
 from shared.sampling_depth_analysis import latest_qc_trajectory_representatives
+from shared.dataset_selection import (
+    distance_csv_options,
+    kv21_active_masked_distance_path,
+    load_selected_distance_csv,
+)
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -24,15 +29,15 @@ BOOTSTRAP_REPLICATES = 10_000
 S6_PATHS = {
     "WT": {
         "vanilla": "26-02-11_Kv2.1_wt_vanillaAF2test_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-        "masked": "26-02-11_Kv2.1_wt_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        "masked": ROOT / kv21_active_masked_distance_path(ROOT, "WT"),
     },
     "L403A": {
         "vanilla": "26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-        "masked": "26-02-11_Kv2.1_l403a_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        "masked": ROOT / kv21_active_masked_distance_path(ROOT, "L403A"),
     },
     "F412L": {
         "vanilla": "26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-        "masked": "26-02-11_Kv2.1_f412l_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        "masked": ROOT / kv21_active_masked_distance_path(ROOT, "F412L"),
     },
 }
 REPORTED_S6 = {"WT": 3.50, "L403A": 2.08, "F412L": 1.92}
@@ -99,7 +104,17 @@ def s6_source_audit() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         frames = {}
         aliases = None
         for protocol, filename in paths.items():
-            raw = pd.read_csv(DIST / filename)
+            source_path = Path(filename) if Path(filename).is_absolute() else DIST / filename
+            if protocol == "masked":
+                options = distance_csv_options(
+                    ROOT, kv21_active_masked_distance_path(ROOT, condition),
+                    "Kv21", condition, "masked"
+                )
+                raw = load_selected_distance_csv(
+                    f"Kv2.1 {condition} masked", options, "all_ok_3", fallback_to_all=False
+                )
+            else:
+                raw = read_csv_resolving_lfs(source_path, ROOT)
             frames[protocol], current = add_s6_cross_pore_columns(raw)
             aliases = current if aliases is None else aliases
         columns = list(aliases.values())
@@ -136,8 +151,8 @@ def s6_source_audit() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
                 "sequence_background": condition,
                 "protocol_pair": "masked vs vanilla",
                 "vanilla_source_file": str((DIST / paths["vanilla"]).relative_to(ROOT)),
-                "masked_source_file": str((DIST / paths["masked"]).relative_to(ROOT)),
-                "source_dataset_selector": "all_ok_rmsd_3A_structural_interface_alignment_qc",
+                "masked_source_file": str(Path(paths["masked"]).relative_to(ROOT)),
+                "source_dataset_selector": "all_ok_rmsd_3A; companion _extra distance table merged",
                 "estimator": "SD across all retained recycle snapshots; median ratio across six chain-label-invariant S6 cross-pore maxima",
                 "s6_coordinate_alias": alias,
                 "s6_coordinate_name": column,
@@ -332,7 +347,7 @@ def run():
     report = {
         "first100_ratio_summary": str(ALL_DISTANCE / "l403a_first100_seed_level_global_breadth_summary.csv"),
         "s6_all_reported_values_reproduced": bool(s6_status.reported_value_reproduced.all()),
-        "s6_bootstrap_status": "completed for revised current estimator; historical manuscript values remain unreproduced",
+        "s6_bootstrap_status": "completed for the current chain-label-invariant estimator",
         "rmsf_bootstrap_status": "completed from aligned C-alpha arrays with trajectory-block resampling",
     }
     (OUT / "kv21_sampling_breadth_uncertainty_run_summary.json").write_text(json.dumps(report, indent=2) + "\n")

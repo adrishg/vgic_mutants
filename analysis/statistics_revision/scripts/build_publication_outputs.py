@@ -26,6 +26,7 @@ from analysis.statistics_revision.scripts.run_seed_block_revision import (
 from scripts.ensemble_rmsf_analysis.materialize_authoritative_masks import _resolve_masks
 from scripts.ensemble_rmsf_analysis.masks import compact_ranges, parse_ranges
 from shared.plotting import CAV12_PALETTE, KV21_PALETTE, apply_kv21_style
+from shared import data_access
 
 OUT = ROOT / "analysis/statistics_revision/paired_seed_v2"
 TABLES = ROOT / "analysis/statistics_revision/tables"
@@ -121,7 +122,7 @@ def figure4() -> None:
     for ax in axes: ax.spines[["top", "right"]].set_visible(False)
     fig.suptitle("Figure 4 | Kv2.1 WT and L403A under vanilla and targeted masking", fontweight="bold")
     for suffix in ("png", "pdf"):
-        fig.savefig(FIGURES / f"Figure4_Kv21_L403A_four_condition_revision.{suffix}", dpi=300 if suffix == "png" else None, bbox_inches="tight")
+        fig.savefig(FIGURES / f"Figure4_Kv21_L403A_four_condition.{suffix}", dpi=300 if suffix == "png" else None, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -171,18 +172,18 @@ def figure7() -> None:
     for ax in axes: ax.spines[["top", "right"]].set_visible(False)
     fig.suptitle("Figure 7 | CaV1.2 mutation-site analyses", fontweight="bold")
     for suffix in ("png", "pdf"):
-        fig.savefig(FIGURES / f"Figure7_Cav12_matched_G402S_R406_screen_revision.{suffix}", dpi=300 if suffix == "png" else None)
+        fig.savefig(FIGURES / f"Figure7_Cav12_matched_G402S_R406_screen.{suffix}", dpi=300 if suffix == "png" else None)
     plt.close(fig)
     write(effects, SOURCE / "figure7D_G402S_matched_CA_effects.csv")
     write(pd.concat([screen, contacts], ignore_index=True), SOURCE / "figure7E_R406_screen_and_contacts.csv")
 
 
 def cohort_manifest() -> None:
-    master = pd.read_csv(OUT / "master_structure_cohort.csv")
+    master = pd.read_csv(data_access.resolve("analysis/statistics_revision/paired_seed_v2/master_structure_cohort.csv"))
     mask_lookup = {
         ("kv21", "WT", "masked"): "kv21_common", ("kv21", "L403A", "masked"): "kv21_common", ("kv21", "F412L", "masked"): "kv21_common",
-        ("cav12", "WT", "masked"): "cav12_wt_common", ("cav12", "G402S", "masked"): "cav12_g402s", ("cav12", "G406R", "masked"): "cav12_g406r",
-        ("nav15", "WT", "masked"): "nav15_standard", ("nav15", "WT", "masked_v2"): "nav15_v2", ("nav15", "WT", "masked_v2_noIFM"): "nav15_v2_noIFM",
+        ("cav12", "WT", "masked"): "cav12_wt_common",
+        ("nav15", "WT", "masked"): "nav15_standard", ("nav15", "WT", "masked_v2"): "nav15_v2",
         ("nav15", "QQQ", "masked"): "nav15_standard_plus_IFM", ("nav15", "QQQ", "masked_v2"): "nav15_v2",
     }
     master["condition"] = master.sequence + " | " + master.protocol
@@ -240,7 +241,7 @@ def figure6_table() -> None:
 
 def methods_manifest() -> None:
     rows = [
-        ("Figure4", "Figure4_Kv21_L403A_four_condition_revision", 0, "descriptive equal-trajectory weighting", "seed and AF2 model parsed from filename"),
+        ("Figure4", "Figure4_Kv21_L403A_four_condition", 0, "descriptive equal-trajectory weighting", "seed and AF2 model parsed from filename"),
         ("Figure4 source", "source_data/figure4_four_condition_trajectory_maxima.csv.gz", 0, "one median per retained seed-model trajectory", "QC-empty trajectories are absent and counted in the cohort manifest"),
         ("Figure4 0-4 source", "source_data/figure4_zero_to_four_elongated_interfaces.csv", 0, "equal weight per retained seed-model trajectory", "five mutually exclusive categories sum to one per condition"),
         ("Figure4 binary interaction", "kv21_interactions_paired_seed.csv", 2000, "complete four-cell nominal seed label", "common RNG pairing is not independently verified"),
@@ -252,9 +253,9 @@ def methods_manifest() -> None:
         ("Figure7E", "g406r_coordinate_screen_statistics.csv", 2000, "whole nominal seed label", "explicit side-chain non-hydrogen atom selection; nominal labels do not prove common RNG pairing"),
         ("Figure7E denominators", "g406r_coordinate_screen_summary.csv", 0, "descriptive retained snapshots/trajectories", "all coordinate-derived numerators and denominators printed"),
         ("Figure7E atom pairs", "source_data/g406r_coordinate_heavy_atom_pair_distances.csv.gz", 0, "one row per snapshot x atom rule x residue pair", "winning atom names stored for all 19 pairs"),
-        ("Historical R406 sensitivity", "g406r_conditional_contact_estimand_reconciliation.csv", 2000, "whole nominal seed label", "historical atom identities unavailable; pooled and hierarchical estimands shown separately"),
+        ("R406 conditional contact sensitivity", "g406r_conditional_contact_estimand_reconciliation.csv", 2000, "whole nominal seed label", "pooled and hierarchical estimands shown separately"),
         ("Cross-channel steric QC", "cross_channel_clashscore_summary.csv", 3000, "whole nominal seed label", "channel repository_QC cohorts"),
-        ("Supplementary Figure S8", "Figure_S8_WT_First100_split_sampling_and_retention", 0, "20 nominal labels x five AF2 models; seed-level breadth", "filename is legacy; visible labels state 20 seeds / 100 model-seeds"),
+        ("Supplementary Figure S8", "Figure_S8_WT_First100_split_sampling_and_retention", 0, "20 nominal labels x five AF2 models; seed-level breadth", "reduced-depth sensitivity with 20 nominal seed labels and 100 model-seed trajectories"),
         ("Supplementary Figure S8 source", "docs/tables/supplementary_figure_s8/*.csv", 0, "seed summaries and retained model-seed trajectories", "no bootstrap interval displayed in this descriptive figure"),
         ("Cohort manifest", "analysis_cohort_manifest.tsv.gz", 0, "one row per analysis x structure snapshot", "QC inclusion and exclusion retained"),
         ("Mask definitions", "mask_definition_equivalence.tsv", 0, "deterministic mask-definition comparison", "production A3Ms unavailable"),

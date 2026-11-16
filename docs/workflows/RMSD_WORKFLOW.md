@@ -41,7 +41,7 @@ interface checks. No new RMSD cutoff is introduced.
 Use the repository's analysis environment:
 
 ```bash
-/Users/ahernandezgonzalez/.local/share/mamba/envs/bioadri/bin/python \
+python \
   scripts/filter_rmsd_by_existing_qc.py \
   --channel kv21 \
   --rmsd-csv kv21/dataRMSD/Kv21_all_models_vs_8SD3_8SDA_RMSD.csv
@@ -50,7 +50,7 @@ Use the repository's analysis environment:
 Audit without writing a filtered RMSD table:
 
 ```bash
-/Users/ahernandezgonzalez/.local/share/mamba/envs/bioadri/bin/python \
+python \
   scripts/filter_rmsd_by_existing_qc.py \
   --channel kv21 \
   --rmsd-csv kv21/dataRMSD/Kv21_all_models_vs_8SD3_8SDA_RMSD.csv \
@@ -63,7 +63,7 @@ Custom destinations are available through `--output` and
 Generate per-condition notebooks:
 
 ```bash
-/Users/ahernandezgonzalez/.local/share/mamba/envs/bioadri/bin/python \
+python \
   scripts/generate_rmsd_notebooks.py \
   --channel kv21 \
   --source kv21/dataRMSD/Kv21_all_models_vs_8SD3_8SDA_RMSD_OK3.csv

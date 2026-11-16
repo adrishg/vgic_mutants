@@ -19,6 +19,7 @@ from shared.plotting import (
     format_channel_title,
     format_distance_alias,
 )
+from shared.data_access import resolve
 
 
 def _display_residue(value: object, channel: str) -> str:
@@ -179,10 +180,7 @@ def cav12_experimental_shortest_distances(
     serine- or arginine-side-chain measurements.
     """
     root = Path(repo_root)
-    mapping_path = (
-        root / "cav12" / "dataRMSF" / "references"
-        / "cav12_aligned_references.npz"
-    )
+    mapping_path = resolve("cav12/dataRMSF/references/cav12_aligned_references.npz")
     mapping = np.load(mapping_path, allow_pickle=False)
     reference_ids = [str(item) for item in mapping["reference_ids"]]
     raw_numbers = mapping["raw_residue_numbers"].astype(int)

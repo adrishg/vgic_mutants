@@ -27,6 +27,7 @@ assignment can generate a nonphysical RMSD tail."""
     nbf.v4.new_code_cell(
         """from pathlib import Path
 import sys
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -36,12 +37,16 @@ repo_root=next(p for p in [Path.cwd(),*Path.cwd().parents] if (p/'shared').is_di
 sys.path.insert(0,str(repo_root))
 from shared.rmsd_analysis import humanize_measurement,apply_kv21_rmsd_qc
 from shared.plotting import ensemble_protocol_palette,experimental_reference_style
+from shared import data_access
+from shared.dataset_selection import kv21_active_rmsd_path, kv21_active_contact_path, kv21_active_masked_distance_path
 
-SOURCE=repo_root/'kv21/dataRMSD/Kv21_all_models_vs_8SD3_8SDA_RMSD_v5.csv'
-CONTACT_SOURCE=repo_root/'kv21/dataRMSD/Kv21_hydrophobic_nexus_contacts_v1_long.csv'
+SOURCE=data_access.resolve(kv21_active_rmsd_path(repo_root))
+CONTACT_SOURCE=data_access.resolve(kv21_active_contact_path(repo_root))
 MANIFEST=repo_root/'kv21/dataRMSF/qc/kv21_all_ok3_selection_manifest.csv'
 FIG=repo_root/'kv21/dataRMSD/analysis/comparison_v5/figures'
-TABLE=repo_root/'kv21/dataRMSD/analysis/comparison_v5'
+external_root=Path(os.environ.get('VGCI_RECONCILIATION_DATA_ROOT',
+                                  str(repo_root.parent / 'reconciliation_data')))
+TABLE=external_root/'kv21/dataRMSD/analysis/comparison_v5'
 FIG.mkdir(parents=True,exist_ok=True); TABLE.mkdir(parents=True,exist_ok=True)
 
 REGIONS={
@@ -387,7 +392,7 @@ contact_columns={
 }
 distance_sources={
     'Vanilla':repo_root/'kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv',
-    'Masked':repo_root/'kv21/dataDistances/26-02-11_Kv2.1_l403a_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv',
+    'Masked':data_access.resolve(kv21_active_masked_distance_path(repo_root, 'L403A')),
 }
 experimental_contacts=kv21_l403a_experimental_shortest_distances(
     repo_root,['PHE414D','LEU318D','PHE414B'])

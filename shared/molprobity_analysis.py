@@ -19,8 +19,9 @@ from scipy import stats
 from statsmodels.stats.multitest import multipletests
 import statsmodels.formula.api as smf
 
+from shared import data_access
 from shared.data_access import resolve
-from shared.dataset_selection import select_manifest_rows
+from shared.dataset_selection import kv21_active_masked_distance_path, select_manifest_rows
 from shared.distribution_statistics import parse_trajectory_metadata
 from shared.paired_seed_statistics import paired_common_seed_bootstrap
 from shared.plotting import (CAV12_PALETTE, KV21_PALETTE, NAV15_PALETTE,
@@ -34,10 +35,23 @@ PREFIX = dict(cav12='Cav12', kv21='Kv21', nav15='Nav15')
 TITLES = dict(cav12='Cav1.2', kv21='Kv2.1', nav15='Nav1.5')
 GENOTYPES = dict(cav12=['WT', 'G402S', 'G406R'], kv21=['WT', 'L403A', 'F412L'],
                  nav15=['WT', 'QQQ'])
-PROTOCOLS = ['vanilla', 'masked', 'masked v2', 'masked v2 no-IFM']
+PROTOCOLS = ['vanilla', 'masked', 'masked v2', 'masked v2 no-IFM', 'masked v3']
 SNAPSHOTS = [f'r{i}' for i in range(11)] + ['final']
 BOOTSTRAPS = 3000
 RANDOM_SEED = 20260930
+
+
+def _convergence_token(channel, protocol, part=None):
+    """Return the staged convergence-directory token for one MolProbity cohort."""
+    names = " ".join(part.get('csv_file', pd.Series(dtype=str)).astype(str)) if part is not None else ""
+    for token in ('masked_v1_50pct', 'masked_v2_50pct', 'masked_v3_50pct'):
+        if token in names:
+            return token
+    return {
+        'masked': 'masked_v1_50pct' if channel == 'nav15' else 'masked_v3_50pct',
+        'masked v2': 'masked_v2_50pct',
+        'masked v2 no-IFM': 'masked_v2_noIFM',
+    }.get(protocol, protocol)
 
 
 def output_dir(channel):
@@ -54,9 +68,56 @@ def load_molprobity(channel, data_root=None):
     Future migration: replace discovery/read_csv here with an explicit manifest
     and shared.data_access.resolve paths. No downstream functions need change.
     """
-    root = Path(data_root or os.environ.get('VGIC_MOLPROBITY_ROOT', ROOT / 'molprobity_download'))
+    if data_root:
+        root = Path(data_root)
+    elif os.environ.get('VGIC_MOLPROBITY_ROOT'):
+        root = Path(os.environ['VGIC_MOLPROBITY_ROOT'])
+    elif data_access.EXTRA_ROOTS:
+        # The external reconciliation tree keeps the CaV1.2 MolProbity files
+        # at its shared top level, while NaV1.5 files remain under the channel
+        # archive. Resolve that layout automatically so a notebook
+        # can be rerun without a channel-specific environment variable.
+        external = data_access.EXTRA_ROOTS[0]
+        channel_root = {
+            'cav12': external / 'molprobity',
+            'nav15': external / 'hive' / 'Nav1.5' / 'molprobity',
+        }.get(channel, external / 'molprobity')
+        root = channel_root if channel_root.is_dir() else external / 'molprobity'
+    else:
+        root = ROOT / 'molprobity_download'
     files = sorted(root.rglob('*.csv'))
     selected = [p for p in files if p.name.startswith(PREFIX[channel] + '_')]
+    if channel == 'kv21':
+        # Only the current 50% masked cohort is part of the public analysis.
+        active_masked = [
+            p for p in selected
+            if '_masked_v3_50pct_' in p.name
+        ]
+        selected = [
+            p for p in selected
+            if '_masked' not in p.name or p in active_masked
+        ]
+    if channel == 'cav12':
+        # Keep only the current 50% masked cohort for each active condition.
+        active_masked = [
+            p for p in selected
+            if '_masked_v3_50pct_' in p.name
+        ]
+        selected = [
+            p for p in selected
+            if '_masked' not in p.name or p in active_masked
+        ]
+    if channel == 'nav15':
+        # Keep only the current 50% masked v1/v2 cohorts.
+        active_masked = [
+            p for p in selected
+            if '_masked_v1_50pct_' in p.name
+            or '_masked_v2_50pct_' in p.name
+        ]
+        selected = [
+            p for p in selected
+            if '_masked' not in p.name or p in active_masked
+        ]
     if not selected:
         raise FileNotFoundError(f'No {PREFIX[channel]} CSVs in {root}; set VGIC_MOLPROBITY_ROOT')
     frames, inventory = [], []
@@ -72,7 +133,13 @@ def load_molprobity(channel, data_root=None):
             raise ValueError(f'{path}: run_name does not match the CSV identity')
         run = path.stem.removesuffix('_clashscores')
         _, genotype, protocol = run.split('_', 2)
-        protocol = {'maskedv2': 'masked v2', 'maskedv2_noIFM': 'masked v2 no-IFM'}.get(protocol, protocol)
+        protocol = {
+            'maskedv2': 'masked v2',
+            'maskedv2_noIFM': 'masked v2 no-IFM',
+            'masked_v1_50pct': 'masked',
+            'masked_v2_50pct': 'masked v2',
+            'masked_v3_50pct': 'masked v3',
+        }.get(protocol, protocol)
         if genotype.upper() not in GENOTYPES[channel] or protocol not in PROTOCOLS:
             raise ValueError(f'Unrecognized ensemble: {run}')
         d['genotype'], d['protocol'] = genotype.upper(), protocol
@@ -126,9 +193,12 @@ def audit_data(raw, channel, out):
     missing_rows, audits, manifest_diffs = [], [], []
     for ensemble, part in d.groupby('ensemble', sort=False):
         genotype, protocol = ensemble.split(' | ')
-        token = {'masked v2':'masked_v2', 'masked v2 no-IFM':'masked_v2_noIFM'}.get(protocol, protocol)
+        token = _convergence_token(channel, protocol, part)
         manifest = ROOT/channel/'rmsd_convergence_filtering'/f'{PREFIX[channel]}_rmsd_convergence_{genotype.lower()}_{token}'/'all_models_manifest.csv'
-        m = pd.read_csv(manifest)
+        # Corrected convergence manifests are stored in the external data
+        # package; resolve keeps the repository notebook independent of the
+        # local staging layout while preventing a legacy fallback.
+        m = pd.read_csv(resolve(manifest))
         names = set(part.model_name)
         for name in set(m.pdb_basename) - names:
             manifest_diffs.append(dict(ensemble=ensemble, model_name=name, issue='manifest model absent from MolProbity'))
@@ -172,14 +242,20 @@ def select_cohorts(data, channel, out):
     for ensemble, part in good.groupby('ensemble', sort=False):
         genotype, protocol = ensemble.split(' | ')
         if channel == 'kv21':
-            rel = f'kv21/dataDistances/26-02-11_Kv2.1_{genotype.lower()}_{protocol}AF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv'
+            if protocol == 'masked':
+                rel = kv21_active_masked_distance_path(ROOT, genotype)
+            else:
+                rel = Path(
+                    f'kv21/dataDistances/26-02-11_Kv2.1_{genotype.lower()}_'
+                    f'{protocol}AF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv'
+                )
             q = pd.read_csv(resolve(rel), usecols=['pdb_file'])
             names = q.pdb_file.map(lambda x: Path(x).name)
             selection = '3 Å + structural/interface/alignment QC'
         else:
-            token = {'masked v2':'masked_v2','masked v2 no-IFM':'masked_v2_noIFM'}.get(protocol,protocol)
+            token = _convergence_token(channel, protocol, part)
             rel = f'{channel}/rmsd_convergence_filtering/{PREFIX[channel]}_rmsd_convergence_{genotype.lower()}_{token}/all_models_manifest.csv'
-            q = select_manifest_rows(ROOT/rel, 'all_ok_3')
+            q = select_manifest_rows(resolve(ROOT / rel), 'all_ok_3')
             names = q.pdb_basename
             selection = '3 Å convergence QC'
         if names.duplicated().any():
@@ -212,8 +288,9 @@ def comparisons(channel, ensembles):
             a,b = f'{a} | {protocol}',f'{b} | {protocol}'
             if {a,b} <= available: pairs.append((a,b))
     if channel == 'nav15':
-        pairs += [('QQQ | masked','QQQ | masked v2'), ('WT | masked','WT | masked v2'),
-                  ('WT | masked v2','WT | masked v2 no-IFM')]
+        pairs += [('QQQ | masked','QQQ | masked v2'), ('WT | masked','WT | masked v2')]
+        if {'WT | masked v2', 'WT | masked v2 no-IFM'} <= available:
+            pairs.append(('WT | masked v2','WT | masked v2 no-IFM'))
     return pairs
 
 
@@ -264,7 +341,7 @@ def contrast_statistics(cohorts, channel, out):
 def colors(channel):
     palette={'cav12':CAV12_PALETTE,'kv21':KV21_PALETTE,'nav15':NAV15_PALETTE}[channel]
     result={f'{g} | {p}':palette[f'{g}_{suffix}'] for g in GENOTYPES[channel]
-            for p,suffix in [('vanilla','VAN'),('masked','HM')]}
+            for p,suffix in [('vanilla','VAN'),('masked','HM'),('masked v3','HM')]}
     if channel=='nav15':
         result.update({'WT | masked v2':palette['WT_MASKED_V2'],
                        'WT | masked v2 no-IFM':palette['WT_MASKED_V2_NOIFM'],
@@ -515,14 +592,20 @@ def focused_interpretation(summary,contrasts,channel,out):
         return f'{r.seed_mean_difference:+.3f} (95% CI {r.CI_low:+.3f} to {r.CI_high:+.3f})'
     if channel=='cav12':
         lines=['**G406R focus.** The global signal is small relative to within-ensemble dispersion.']
-        for protocol in ['vanilla','masked']:
+        # The active CaV1.2 masked cohort is the current v3 50% set.  Keep
+        # its protocol label explicit so the interpretation uses the same
+        # ensemble names as load_molprobity() and the generated tables.
+        for protocol in ['vanilla','masked v3']:
             wt,g402,g406=[f'{g} | {protocol}' for g in ['WT','G402S','G406R']]
-            lines.append(f'- {protocol.capitalize()}: WT/G402S/G406R clashscore medians are {median(wt):.3f}/{median(g402):.3f}/{median(g406):.3f}; G406R−WT seed-balanced difference is {difference(wt,g406)}. G406R−G402S is {difference(g402,g406)}. Bad-clash medians are {median(wt,"n_bad_clashes"):.0f}/{median(g402,"n_bad_clashes"):.0f}/{median(g406,"n_bad_clashes"):.0f}; maximum-overlap medians are {median(wt,"max_overlap"):.3f}/{median(g402,"max_overlap"):.3f}/{median(g406,"max_overlap"):.3f} Å.')
+            label = 'Masked v3' if protocol == 'masked v3' else protocol.capitalize()
+            lines.append(f'- {label}: WT/G402S/G406R clashscore medians are {median(wt):.3f}/{median(g402):.3f}/{median(g406):.3f}; G406R−WT seed-balanced difference is {difference(wt,g406)}. G406R−G402S is {difference(g402,g406)}. Bad-clash medians are {median(wt,"n_bad_clashes"):.0f}/{median(g402,"n_bad_clashes"):.0f}/{median(g406,"n_bad_clashes"):.0f}; maximum-overlap medians are {median(wt,"max_overlap"):.3f}/{median(g402,"max_overlap"):.3f}/{median(g406,"max_overlap"):.3f} Å.')
         lines.append('The current data support modest protocol-associated global shifts, not a distinctive large G406R global clash phenotype. They cannot locate a clash at R406 or exclude a severe local contact diluted in a global score. The existing short local distances still justify parsing atom-level cluster logs: identify R406-involving atom pairs, contact frequencies and overlap magnitudes, with WT/G402S controls. Keep this global comparison as QC; local attribution remains untested.')
     elif channel=='nav15':
-        lines=[f'**Primary sequence versus mask comparison.** WT vanilla and QQQ vanilla medians are {median("WT | vanilla"):.2f} and {median("QQQ | vanilla"):.2f}; seed-balanced QQQ−WT is {difference("WT | vanilla","QQQ | vanilla")}. QQQ masking raises the median to {median("QQQ | masked"):.2f}, with a seed-balanced change of {difference("QQQ | vanilla","QQQ | masked")}.',
-               f'QQQ masked v2 versus original masked changes the mean by {difference("QQQ | masked","QQQ | masked v2")}. The WT no-IFM control versus WT masked v2 changes it by {difference("WT | masked v2","WT | masked v2 no-IFM")}.',
+        lines=[f'**Primary sequence versus mask comparison.** WT vanilla and QQQ vanilla medians are {median("WT | vanilla"):.2f} and {median("QQQ | vanilla"):.2f}; seed-balanced QQQ−WT is {difference("WT | vanilla","QQQ | vanilla")}. QQQ corrected masked v1 raises the median to {median("QQQ | masked"):.2f}, with a seed-balanced change of {difference("QQQ | vanilla","QQQ | masked")}.',
+               f'Corrected masked v2 versus corrected masked v1 changes the mean by {difference("QQQ | masked","QQQ | masked v2")}.',
                'The principal global difference follows mask design, not the QQQ substitution under vanilla. Maximum-overlap medians remain close across the ensembles; there is no unique catastrophic global-quality outlier among the retained conditions. This is a relative QC statement, not certification of atomistic quality in these unrelaxed models. The mask-related clashscore cost is useful alongside the pore-sampling figures; most alternative-mask results belong in supplementary QC.']
+        if {'WT | masked v2', 'WT | masked v2 no-IFM'} <= set(c.A).union(c.B):
+            lines.insert(1, f'The WT no-IFM control versus WT corrected masked v2 changes the mean by {difference("WT | masked v2","WT | masked v2 no-IFM")}.')
     else:
         a=pd.read_csv(out/'tables/conformation_associations.csv')
         lines=['**Global quality and S6.** Masking changes the seed-balanced mean clashscore by '+ '; '.join(f'{g}: {difference(g+" | vanilla",g+" | masked")}' for g in GENOTYPES[channel])+'.',

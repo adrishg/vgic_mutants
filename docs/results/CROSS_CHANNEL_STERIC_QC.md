@@ -21,4 +21,6 @@ The Cav1.2 R406-centered overlap screen is a separate local endpoint. Passing th
 
 Source tables: `<channel>/dataExtra/molprobity/tables/contrasts.csv`.
 
-The historical exports identify the program as Phenix MolProbity but do not record the software version, command-line/options, or whether hydrogens were added, retained, or optimized. Those fields are therefore reported as `not recorded` in the source table rather than reconstructed by assumption.
+The deposited source tables identify the program as Phenix MolProbity but do not record the software
+version, command-line/options, or whether hydrogens were added, retained, or optimized. Those fields
+are therefore reported as `not recorded` in the source table rather than reconstructed by assumption.

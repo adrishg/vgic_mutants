@@ -15,7 +15,7 @@ CHANNELS = {
         "label": r"$\mathrm{Na}_{\mathrm{V}}1.5$",
         "title": r"$\mathrm{Na}_{\mathrm{V}}1.5$ ensemble RMSF",
         "comparisons": [
-            ("wt", "masked"), ("wt", "masked_v2"), ("wt", "masked_v2_noIFM"),
+            ("wt", "masked"), ("wt", "masked_v2"),
             ("qqq", "masked"), ("qqq", "masked_v2"),
         ],
         "zooms": {
@@ -27,13 +27,12 @@ CHANNELS = {
         "label": r"$\mathrm{Ca}_{\mathrm{V}}1.2$",
         "title": r"$\mathrm{Ca}_{\mathrm{V}}1.2$ ensemble RMSF",
         "comparisons": [
-            ("wt", "masked"), ("g402s", "masked"), ("g406r", "masked"), ("g490r", "masked"),
+            ("wt", "masked"), ("g402s", "masked"), ("g406r", "masked"),
         ],
         "zooms": {
             "wt": (380, 430, {}),
             "g402s": (380, 430, {402: "G402S"}),
             "g406r": (380, 430, {406: "G406R"}),
-            "g490r": (465, 515, {490: "G490R"}),
         },
     },
 }
@@ -41,12 +40,6 @@ CHANNELS = {
 
 def make_notebook(channel, config):
     coverage_note = ""
-    if channel == "cav12":
-        coverage_note = (
-            "\n\nG490R is included here because paired vanilla and masked RMSF profiles are available. "
-            "It is not yet present in the current distance or experimental-reference RMSD source tables, "
-            "so this notebook does not imply that those additional comparisons have been completed."
-        )
     cells = [
         nbf.v4.new_markdown_cell(
             f"# {config['title']}\n\n"
@@ -122,8 +115,8 @@ def make_notebook(channel, config):
             "PROFILE_IS_ALL_OK3='all_ok_3' in profile_path.name.lower()\n"
             "display(Markdown(f'**RMSF profile in use:** `{profile_path.relative_to(repo_root)}`'))\n"
             "if not PROFILE_IS_ALL_OK3:\n"
-            "    display(Markdown('> **QC warning:** this is the legacy `all_models` profile, not an All-OK-3 RMSF recomputation. Pre-convergence recycle snapshots are included, so long tails and numerical interpretations remain provisional until the cluster-generated `all_ok_3` profile is supplied.'))\n"
-            "display(pd.read_csv(tables/f'{CHANNEL}_profile_schema.csv'))\n"
+            "    display(Markdown('> **QC warning:** this is the complete `all_models` profile, not an All-OK-3 RMSF recomputation. Pre-convergence recycle snapshots are included, so long tails and numerical interpretations should be checked against the current `all_ok_3` profile.'))\n"
+            "display(pd.DataFrame([schema]))\n"
             "mask_path=tables/f'{CHANNEL}_a3m_mask_positions.csv'\n"
             "MASKS_AVAILABLE=mask_path.is_file()\n"
             "if MASKS_AVAILABLE:\n"

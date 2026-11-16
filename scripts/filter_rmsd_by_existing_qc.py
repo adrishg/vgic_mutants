@@ -169,7 +169,7 @@ def discover_manifests(repo: Path, channel: str) -> dict[str, Path]:
     for path in sorted(root.glob("*/all_models_manifest.csv")):
         identity = path.parent.name.lower()
         identity = re.sub(r"^(kv21|nav15|cav12)_rmsd_convergence_", "", identity)
-        if identity.endswith("_test") or identity.startswith("g490r_"):
+        if identity.endswith("_test"):
             continue
         result[identity] = path
     return result

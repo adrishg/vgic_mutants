@@ -11,29 +11,17 @@ REPO_ROOT = Path(__file__).resolve().parent
 DATA_DIR = REPO_ROOT / "nav15" / "dataDistances"
 
 DATASETS = {
+    # Vanilla tables are unchanged and remain eligible for this
+    # re-filtering utility. Corrected masked v1/v2 tables are selected through
+    # the active cohort manifest and reconciliation workflow, not these retired
+    # filename-based inputs.
     "WT vanilla": (
         "26-07-27_Nav15_wt_vanillaAF2_distances_all_all.csv",
         "25-12-02_Nav15_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv",
     ),
-    "WT masked v2": (
-        "26-07-27_Nav15_wt_maskedv2_AF2_distances_all_all.csv",
-        "26-07-25_Nav15_wt_maskedv2_AF2_distances_all_ok_rmsd_3A.csv",
-    ),
-    "WT masked v2 no-IFM": (
-        "26-07-27_Nav15_wt_maskedv2_noIFM_AF2_distances_all_all.csv",
-        "26-07-25_Nav15_wt_maskedv2_noIFM_AF2_distances_all_ok_rmsd_3A.csv",
-    ),
     "QQQ vanilla": (
         "26-07-27_Nav15_qqq_vanilla_AF2_distances_all_all.csv",
         "26-02-01_Nav15_qqq_vanilla_distances_all_ok_rmsd_3A.csv",
-    ),
-    "QQQ masked": (
-        "26-07-27_Nav15_qqq_masked_AF2_distances_all_all.csv",
-        "26-07-24_Nav15_qqq_maskedAF2_distances_all_ok_rmsd_3A.csv",
-    ),
-    "QQQ masked v2": (
-        "26-07-27_Nav15_qqq_maskedv2_AF2_distances_all_all.csv",
-        "26-07-25_Nav15_qqq_maskedAF2v2_distances_all_ok_rmsd_3A.csv",
     ),
 }
 

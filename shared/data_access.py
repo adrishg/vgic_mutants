@@ -20,10 +20,22 @@ HF_REVISION = os.environ.get("VGIC_HF_REVISION", "main")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CACHE_ROOT = Path(os.environ.get("VGIC_CACHE", Path.home() / ".cache" / "vgic-mutants"))
 
-_EXTRA_ROOT = os.environ.get("VGIC_DATA_ROOT")
-EXTRA_ROOTS = [Path(_EXTRA_ROOT)] if _EXTRA_ROOT else []
+_EXTRA_ROOT = os.environ.get("VGIC_DATA_ROOT") or os.environ.get("VGCI_RECONCILIATION_DATA_ROOT")
+if _EXTRA_ROOT:
+    EXTRA_ROOTS = [Path(_EXTRA_ROOT).expanduser()]
+else:
+    EXTRA_ROOTS = []
 
 _CHANNELS = {"cav12": "Cav1.2", "kv21": "Kv2.1", "nav15": "Nav1.5"}
+
+# External reconciliation data retain the channel names used by the companion
+# release and may be nested below an archive prefix. Repository notebooks use
+# the short channel directory names so they remain portable.
+_EXTERNAL_CHANNEL_NAMES = {
+    "cav12": "Cav1.2",
+    "kv21": "Kv2.1",
+    "nav15": "Nav1.5",
+}
 
 # The dataset already uses ``distances`` for the pre-QC tables, so that name is kept.
 _BUCKETS = {
@@ -86,6 +98,20 @@ def _usable(path: Path) -> bool:
     return path.is_file() and not _is_lfs_pointer(path)
 
 
+def _candidate_paths(root: Path, rel: Path):
+    """Yield supported layouts for one repository-relative data path."""
+    yield root / rel
+    parts = rel.parts
+    if not parts:
+        return
+    channel_name = _EXTERNAL_CHANNEL_NAMES.get(parts[0].lower())
+    if channel_name is None:
+        return
+    remainder = Path(*parts[1:])
+    yield root / channel_name / remainder
+    yield root / "hive" / channel_name / remainder
+
+
 def resolve(rel_path: str | Path) -> Path:
     """Return a readable local path, fetching it once if it is not already here."""
     rel = Path(rel_path)
@@ -100,8 +126,9 @@ def resolve(rel_path: str | Path) -> Path:
             raise FileNotFoundError(rel)
 
     for root in (REPO_ROOT, *EXTRA_ROOTS):
-        if _usable(root / rel):
-            return root / rel
+        for candidate in _candidate_paths(root, rel):
+            if _usable(candidate):
+                return candidate
 
     cached = CACHE_ROOT / rel
     if _usable(cached):

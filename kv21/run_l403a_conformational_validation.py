@@ -21,6 +21,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 from shared.plotting import apply_kv21_style, KV21_PALETTE, experimental_reference_style
+from shared.data_access import resolve
+from shared.dataset_selection import kv21_active_masked_distance_path
 
 ROOT = REPO_ROOT
 DATA = ROOT / "kv21" / "dataExtra"
@@ -112,19 +114,24 @@ def load_distance_qc_selection(chain):
     """Select exact structures retained by the established distance workflow."""
     names = {
         ("wt","vanilla"): "26-02-11_Kv2.1_wt_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-        ("wt","masked"): "26-02-11_Kv2.1_wt_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        ("wt","masked"): kv21_active_masked_distance_path(ROOT, "WT"),
         ("l403a","vanilla"): "26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-        ("l403a","masked"): "26-02-11_Kv2.1_l403a_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        ("l403a","masked"): kv21_active_masked_distance_path(ROOT, "L403A"),
         ("f412l","vanilla"): "26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-        ("f412l","masked"): "26-02-11_Kv2.1_f412l_maskedAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        ("f412l","masked"): kv21_active_masked_distance_path(ROOT, "F412L"),
     }
     manifest=[]; audit=[]
     unique=chain[chain.source_type.eq("prediction")][["structure_id","condition","protocol","source_path","seed","model_number","recycle"]].drop_duplicates("structure_id").copy()
     unique["pdb_basename"]=unique.source_path.map(lambda x: os.path.basename(str(x)))
     if unique.pdb_basename.duplicated().any(): raise ValueError("Conformational structure basenames are not unique")
     for key,name in names.items():
-        path=ROOT/"kv21"/"dataDistances"/name
-        d=pd.read_csv(path,usecols=lambda c:c in {"pdb_file","seed","model_number","recycle","recycle_number"},low_memory=False)
+        if Path(name).is_absolute():
+            path = Path(name)
+        elif str(name).startswith("kv21/"):
+            path = ROOT / name
+        else:
+            path = ROOT / "kv21" / "dataDistances" / name
+        d=pd.read_csv(resolve(path),usecols=lambda c:c in {"pdb_file","seed","model_number","recycle","recycle_number"},low_memory=False)
         d["pdb_basename"]=d.pdb_file.map(lambda x:os.path.basename(str(x)))
         if d.pdb_basename.duplicated().any(): raise ValueError(f"Duplicate QC basename in {path}")
         c=unique[(unique.condition==key[0])&(unique.protocol==key[1])]
