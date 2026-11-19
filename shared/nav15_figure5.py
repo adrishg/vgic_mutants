@@ -135,9 +135,9 @@ def plot_mask_tradeoff(
     fig, axes = plt.subplots(1, 3, figsize=(14.8, 6.1))
 
     summary_index = summaries.set_index("Dataset")
-    wt_order = ["WT | vanilla", "WT | masked v2"]
+    wt_order = ["WT | vanilla", "WT | masked"]
     wt_values = summary_index.loc[wt_order, "Pocket-engaged fraction"]
-    wt_colors = [NAV15_PALETTE["WT_VAN"], NAV15_PALETTE["WT_MASKED_V2"]]
+    wt_colors = [NAV15_PALETTE["WT_VAN"], NAV15_PALETTE["WT_HM"]]
     bars = axes[0].bar(
         range(2),
         wt_values,
@@ -544,11 +544,11 @@ def plot_orthogonal_gate_geometry(
     """
     colors = {
         "WT | vanilla": NAV15_PALETTE["WT_VAN"],
-        "WT | masked v2": NAV15_PALETTE["WT_MASKED_V2"],
+        "WT | masked": NAV15_PALETTE["WT_HM"],
         "QQQ | vanilla": NAV15_PALETTE["QQQ_VAN"],
         "QQQ | masked": NAV15_PALETTE["QQQ_HM"],
     }
-    order = ["WT | vanilla", "WT | masked v2", "QQQ | vanilla", "QQQ | masked"]
+    order = ["WT | vanilla", "WT | masked", "QQQ | vanilla", "QQQ | masked"]
     records: list[dict[str, float | int | str]] = []
     prepared: dict[str, pd.DataFrame] = {}
 
@@ -753,10 +753,10 @@ def plot_gate_engagement_coupling(
     receptor asparagines.  Both coordinates therefore remain transparent
     distance summaries rather than inferred functional-state assignments.
     """
-    order = ["WT | vanilla", "WT | masked v2", "QQQ | vanilla", "QQQ | masked"]
+    order = ["WT | vanilla", "WT | masked", "QQQ | vanilla", "QQQ | masked"]
     colors = {
         "WT | vanilla": NAV15_PALETTE["WT_VAN"],
-        "WT | masked v2": NAV15_PALETTE["WT_MASKED_V2"],
+        "WT | masked": NAV15_PALETTE["WT_HM"],
         "QQQ | vanilla": NAV15_PALETTE["QQQ_VAN"],
         "QQQ | masked": NAV15_PALETTE["QQQ_HM"],
     }
