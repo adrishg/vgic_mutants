@@ -391,7 +391,7 @@ contact_columns={
     'F412B':'shortest_ALA405A-PHE414B',
 }
 distance_sources={
-    'Vanilla':repo_root/'kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv',
+    'Vanilla':repo_root/'kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv',
     'Masked':data_access.resolve(kv21_active_masked_distance_path(repo_root, 'L403A')),
 }
 experimental_contacts=kv21_l403a_experimental_shortest_distances(

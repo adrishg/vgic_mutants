@@ -27,6 +27,7 @@ from shared.distribution_statistics import parse_trajectory_metadata
 from shared.seed_block_statistics import analyze_seed_distance, leave_one_model_out
 from scripts.ensemble_rmsf_analysis.io import resolve_local_lfs_object
 from shared.dataset_selection import (
+    filtered_masked_distance_path,
     kv21_active_masked_distance_path,
     nav15_active_masked_distance_path,
     cav12_active_masked_distance_path,
@@ -42,24 +43,24 @@ GATE_COLUMNS = [
 ]
 
 FINAL_DISTANCE_PATHS = {
-    "kv21|WT|vanilla": "kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2test_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-    "kv21|WT|masked": str(kv21_active_masked_distance_path(ROOT, "WT")),
-    "kv21|L403A|vanilla": "kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-    "kv21|L403A|masked": str(kv21_active_masked_distance_path(ROOT, "L403A")),
-    "kv21|F412L|vanilla": "kv21/dataDistances/26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
-    "kv21|F412L|masked": str(kv21_active_masked_distance_path(ROOT, "F412L")),
+    "kv21|WT|vanilla": "kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
+    "kv21|WT|masked": str(filtered_masked_distance_path(ROOT, 'kv21', "WT")),
+    "kv21|L403A|vanilla": "kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
+    "kv21|L403A|masked": str(filtered_masked_distance_path(ROOT, 'kv21', "L403A")),
+    "kv21|F412L|vanilla": "kv21/dataDistances/26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
+    "kv21|F412L|masked": str(filtered_masked_distance_path(ROOT, 'kv21', "F412L")),
     "nav15|WT|vanilla": "nav15/dataDistances/26-07-27_Nav15_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-    "nav15|WT|masked": str(nav15_active_masked_distance_path(ROOT, "WT", "v1")),
-    "nav15|WT|masked_v2": str(nav15_active_masked_distance_path(ROOT, "WT", "v2")),
+    "nav15|WT|masked": str(filtered_masked_distance_path(ROOT, 'nav15', "WT", "v1")),
+    "nav15|WT|masked_v2": str(filtered_masked_distance_path(ROOT, 'nav15', "WT", "v2")),
     "nav15|QQQ|vanilla": "nav15/dataDistances/26-07-27_Nav15_qqq_vanilla_AF2_distances_all_ok_rmsd_3A.csv",
-    "nav15|QQQ|masked": str(nav15_active_masked_distance_path(ROOT, "QQQ", "v1")),
-    "nav15|QQQ|masked_v2": str(nav15_active_masked_distance_path(ROOT, "QQQ", "v2")),
+    "nav15|QQQ|masked": str(filtered_masked_distance_path(ROOT, 'nav15', "QQQ", "v1")),
+    "nav15|QQQ|masked_v2": str(filtered_masked_distance_path(ROOT, 'nav15', "QQQ", "v2")),
     "cav12|WT|vanilla": "cav12/dataDistances/26-02-10_Cav12_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-    "cav12|WT|masked": str(cav12_active_masked_distance_path(ROOT, "WT")),
+    "cav12|WT|masked": str(filtered_masked_distance_path(ROOT, 'cav12', "WT")),
     "cav12|G402S|vanilla": "cav12/dataDistances/26-02-10_Cav12_g402s_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-    "cav12|G402S|masked": str(cav12_active_masked_distance_path(ROOT, "G402S")),
+    "cav12|G402S|masked": str(filtered_masked_distance_path(ROOT, 'cav12', "G402S")),
     "cav12|G406R|vanilla": "cav12/dataDistances/26-07-25_Cav1.2_g406r_vanillaAF2_distances_all_ok_rmsd_3A.csv",
-    "cav12|G406R|masked": str(cav12_active_masked_distance_path(ROOT, "G406R")),
+    "cav12|G406R|masked": str(filtered_masked_distance_path(ROOT, 'cav12', "G406R")),
 }
 
 
@@ -501,7 +502,7 @@ def retention_analysis(master: pd.DataFrame, output: Path, bootstrap: int) -> No
 
 
 def f412l_analysis(output: Path, bootstrap: int) -> None:
-    source = ROOT / "kv21/dataRMSD/analysis/comparison_v5/f412l_pocket_D_paper_nexus_shortest_contacts_long_v5.csv"
+    source = ROOT / "kv21/dataDistances/analysis/F412L_nexus_shortest_contacts_long.csv"
     long = read_csv(source)
     value = "Shortest heavy-atom distance (Å)"
     wide = long.pivot_table(index=["Protocol", "pdb_file"], columns="Contact", values=value, aggfunc="first").reset_index()

@@ -28,15 +28,15 @@ BOOTSTRAP_REPLICATES = 10_000
 
 S6_PATHS = {
     "WT": {
-        "vanilla": "26-02-11_Kv2.1_wt_vanillaAF2test_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        "vanilla": "26-02-11_Kv2.1_wt_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
         "masked": ROOT / kv21_active_masked_distance_path(ROOT, "WT"),
     },
     "L403A": {
-        "vanilla": "26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        "vanilla": "26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
         "masked": ROOT / kv21_active_masked_distance_path(ROOT, "L403A"),
     },
     "F412L": {
-        "vanilla": "26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        "vanilla": "26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
         "masked": ROOT / kv21_active_masked_distance_path(ROOT, "F412L"),
     },
 }
@@ -198,7 +198,16 @@ def s6_source_audit() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
 def _selected_rmsf_rows(metadata: pd.DataFrame) -> pd.DataFrame:
     selected = []
-    paths = sorted(DIST.glob("*_all_ok_rmsd_3A_structural_interface_qc.csv"))
+    from shared import data_access
+    roots = [DIST, *[root / "kv21" / "dataDistances" for root in data_access.EXTRA_ROOTS]]
+    paths = []
+    for root in roots:
+        paths = sorted(
+            path for path in root.glob("*_all_ok_rmsd_3A_structural_interface_qc.csv")
+            if "_extra_" not in path.name
+        )
+        if paths:
+            break
     if len(paths) != 6:
         raise FileNotFoundError(f"Expected six Kv2.1 RMSF QC allowlists, found {len(paths)}")
     lookup = metadata[["manifest_index", "pdb_file", "dataset", "sequence_condition", "protocol",

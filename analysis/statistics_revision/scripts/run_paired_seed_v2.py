@@ -465,7 +465,7 @@ def l403a(output: Path, bootstrap: int, permutations: int) -> None:
 
 
 def f412l(output: Path, bootstrap: int) -> None:
-    path = ROOT / "kv21/dataRMSD/analysis/comparison_v5/f412l_pocket_D_paper_nexus_shortest_contacts_long_v5.csv"
+    path = ROOT / "kv21/dataDistances/analysis/F412L_nexus_shortest_contacts_long.csv"
     long = read_csv(path)
     value = "Shortest heavy-atom distance (Å)"
     wide = long.pivot_table(index=["Protocol", "pdb_file"], columns="Contact", values=value, aggfunc="first").reset_index()

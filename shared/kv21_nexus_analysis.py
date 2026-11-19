@@ -20,7 +20,7 @@ from Bio.PDB import PDBParser
 
 from shared import data_access
 from shared.dataset_selection import (
-    kv21_active_masked_distance_path,
+    filtered_masked_distance_path,
     kv21_active_rmsd_path,
 )
 from shared.rmsd_analysis import apply_kv21_rmsd_qc
@@ -195,7 +195,10 @@ def _nexus_distance_columns(columns) -> list[str]:
     return selected
 
 
-def contact_signature(repo_root: str | Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+def contact_signature(
+    repo_root: str | Path,
+    sequences: tuple[tuple[str, str], ...] = (("wt", "WT"), ("f412l", "F412L")),
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Summarize nearest nexus contacts in WT and F412L allOK3 models.
 
     Cross-chain labels cannot be compared directly between 8SD3, 8SDA and AF2
@@ -206,11 +209,11 @@ def contact_signature(repo_root: str | Path) -> tuple[pd.DataFrame, pd.DataFrame
     root = Path(repo_root)
     allowed = _all_ok3_basenames(root)
     records = []
-    for sequence_key, sequence_label in (("wt", "WT"), ("f412l", "F412L")):
+    for sequence_key, sequence_label in sequences:
         for protocol in ("vanilla", "masked"):
             if protocol == "masked":
                 source = data_access.resolve(
-                    kv21_active_masked_distance_path(root, sequence_label)
+                    filtered_masked_distance_path(root, 'kv21', sequence_label)
                 )
             else:
                 source = data_access.resolve(
@@ -218,7 +221,7 @@ def contact_signature(repo_root: str | Path) -> tuple[pd.DataFrame, pd.DataFrame
                     / "kv21/dataDistances"
                     / (
                         f"26-02-11_Kv2.1_{sequence_key}_{protocol}AF2_distances_"
-                        "all_ok_rmsd_3A_structural_interface_alignment_qc.csv"
+                        "all_ok_rmsd_3A_structural_interface_qc.csv"
                     )
                 )
             if not source.is_file():
@@ -498,7 +501,7 @@ def plot_contact_distances(model_table: pd.DataFrame, experimental: pd.DataFrame
 
 
 def plot_f412l_contact_distances(
-    model_table: pd.DataFrame, experimental: pd.DataFrame
+    model_table: pd.DataFrame, experimental: pd.DataFrame, sequence: str = "F412L"
 ):
     """Show F412L vanilla and masked ensembles as paired split violins."""
     order = [
@@ -506,9 +509,10 @@ def plot_f412l_contact_distances(
         "L403 (neighboring S6)",
     ]
     protocol_colors = {
-        "Vanilla": KV21_PALETTE["F412L_VAN"],
-        "Masked": KV21_PALETTE["F412L_HM"],
+        "Vanilla": KV21_PALETTE[f"{sequence}_VAN"],
+        "Masked": KV21_PALETTE[f"{sequence}_HM"],
     }
+    source = "L412" if sequence == "F412L" else "F412"
     offsets = {"8SD3 | WT": -.10, "8SDA | L403A": .10}
     colors = {
         "8SD3 | WT": RMSD_REFERENCE_STYLES["8SD3"]["color"],
@@ -518,7 +522,7 @@ def plot_f412l_contact_distances(
         "8SD3 | WT": RMSD_REFERENCE_STYLES["8SD3"]["marker"],
         "8SDA | L403A": RMSD_REFERENCE_STYLES["8SDA"]["marker"],
     }
-    mutant = model_table.loc[model_table["Sequence"].eq("F412L")].copy()
+    mutant = model_table.loc[model_table["Sequence"].eq(sequence)].copy()
     fig, ax = plt.subplots(figsize=(9.8, 6.2))
     sns.violinplot(
         data=mutant,
@@ -552,9 +556,9 @@ def plot_f412l_contact_distances(
             )
     ax.axhline(4, color="#71637A", linestyle="--", linewidth=.8)
     ax.set_xticks(range(len(order)), [
-        "L412→L316\nsame-chain S4–S5 linker",
-        "L412→L329\nclosest neighboring S5",
-        "L412→L403\nclosest neighboring S6",
+        f"{source}→L316\nsame-chain S4–S5 linker",
+        f"{source}→L329\nclosest neighboring S5",
+        f"{source}→{'A' if sequence == 'L403A' else 'L'}403\nclosest neighboring S6",
     ])
     ax.set_xlabel("Hydrophobic-nexus interaction")
     ax.set_ylabel("Shortest heavy-atom distance (Å)")
@@ -568,13 +572,13 @@ def plot_f412l_contact_distances(
             facecolor=protocol_colors["Vanilla"],
             edgecolor="#425047",
             linewidth=.65,
-            label="F412L | vanilla",
+            label=f"{sequence} | vanilla",
         ),
         Patch(
             facecolor=protocol_colors["Masked"],
             edgecolor="#425047",
             linewidth=.65,
-            label="F412L | masked",
+            label=f"{sequence} | masked",
         ),
     ]
     for reference in ("8SD3 | WT", "8SDA | L403A"):
@@ -587,20 +591,20 @@ def plot_f412l_contact_distances(
         )
     fig.legend(
         handles=legend_handles,
-        title="F412L ensembles and Kv2.1 references",
+        title=f"{sequence} ensembles and Kv2.1 references",
         frameon=False,
         ncol=4,
         loc="lower center",
         bbox_to_anchor=(.5, .065),
     )
     fig.suptitle(
-        format_channel_title("Kv2.1 | F412L | hydrophobic-nexus geometry"),
+        format_channel_title(f"Kv2.1 | {sequence} | hydrophobic-nexus geometry"),
         fontweight="bold",
         y=.99,
     )
     fig.text(
         .5, .012,
-        "Left violin half: F412L vanilla; right half: F412L masked. "
+        f"Left violin half: {sequence} vanilla; right half: {sequence} masked. "
         "Experimental markers: F412 in 8SD3 WT and chain-resolved 8SDA "
         "L403A. Dashed line: 4 Å proximity guide.",
         ha="center", fontsize=8.7, color="#665A70",
@@ -667,3 +671,18 @@ def write_nexus_outputs(repo_root: str | Path):
         "geometry_figure": geometry_figure,
         "mutant_geometry_figure": mutant_geometry_figure,
     }
+
+
+def write_l403a_nexus_outputs(repo_root: str | Path):
+    """F412-centered nexus geometry in the L403A ensembles (manuscript Fig. 4E)."""
+    root = Path(repo_root)
+    output = root / "kv21/dataRMSD/analysis/nexus"
+    (output / "figures").mkdir(parents=True, exist_ok=True)
+    pairs, summary = contact_signature(root, sequences=(("l403a", "L403A"),))
+    experimental = experimental_contact_signature(root)
+    pairs.to_csv(output / "l403a_nexus_contact_chain_pairs.csv", index=False)
+    summary.to_csv(output / "l403a_nexus_contact_summary.csv", index=False)
+    figure = plot_f412l_contact_distances(pairs, experimental, sequence="L403A")
+    figure.savefig(output / "figures/l403a_nexus_geometry_vs_experiment.png", dpi=400, bbox_inches="tight")
+    figure.savefig(output / "figures/l403a_nexus_geometry_vs_experiment.pdf", bbox_inches="tight")
+    return summary

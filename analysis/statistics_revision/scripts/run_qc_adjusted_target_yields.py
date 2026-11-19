@@ -67,7 +67,7 @@ def main() -> None:
         "Kv2.1 L403A experiment-anchored shifted interface", bootstrap, BASE_SEED + 10000,
     )
 
-    contact_path = ROOT / "kv21/dataRMSD/analysis/comparison_v5/f412l_pocket_D_paper_nexus_shortest_contacts_long_v5.csv"
+    contact_path = ROOT / "kv21/dataDistances/analysis/F412L_nexus_shortest_contacts_long.csv"
     contact = read_csv(contact_path)
     value = "Shortest heavy-atom distance (Å)"
     wide = contact.pivot_table(index=["Protocol", "pdb_file"], columns="Contact", values=value, aggfunc="first").reset_index()
@@ -85,7 +85,13 @@ def main() -> None:
         protocol: add_metadata(read_csv(ROOT / FINAL_DISTANCE_PATHS[f"cav12|G406R|{protocol}"]))
         for protocol in ("vanilla", "masked")
     }
-    centered = [column for column in g406["vanilla"] if column.startswith("shortest_ARG406-")]
+    # Same rule as run_paired_seed_v2: columns present in both protocols, without
+    # the covalent/adjacent GLU407 and GLU411 environment.
+    centered = [
+        column for column in g406["vanilla"]
+        if column.startswith("shortest_ARG406-") and column in g406["masked"]
+        and column not in {"shortest_ARG406-GLU407", "shortest_ARG406-GLU411"}
+    ]
     for protocol, frame in g406.items():
         distances = frame[centered].apply(pd.to_numeric, errors="coerce")
         frame["overlap_pass"] = (~distances.lt(2).any(axis=1)).astype(float)

@@ -113,11 +113,11 @@ def load_inputs():
 def load_distance_qc_selection(chain):
     """Select exact structures retained by the established distance workflow."""
     names = {
-        ("wt","vanilla"): "26-02-11_Kv2.1_wt_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        ("wt","vanilla"): "26-02-11_Kv2.1_wt_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
         ("wt","masked"): kv21_active_masked_distance_path(ROOT, "WT"),
-        ("l403a","vanilla"): "26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        ("l403a","vanilla"): "26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
         ("l403a","masked"): kv21_active_masked_distance_path(ROOT, "L403A"),
-        ("f412l","vanilla"): "26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv",
+        ("f412l","vanilla"): "26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
         ("f412l","masked"): kv21_active_masked_distance_path(ROOT, "F412L"),
     }
     manifest=[]; audit=[]
@@ -342,7 +342,7 @@ def run():
     pi,pi_summary=load_pi(set(selected.structure_id)); make_figures(selected,effects,pi)
     summary={"chain_rows":len(chain),"prediction_structures":int(chain.query("source_type=='prediction'").structure_id.nunique()),
              "selected_prediction_structures":int(selected.query("source_type=='prediction'").structure_id.nunique()),
-             "seeds_per_condition_protocol":100,"bootstrap_replicates":N_BOOT,"primary_selection":"all_ok_rmsd_3A_structural_interface_alignment_qc",
+             "seeds_per_condition_protocol":100,"bootstrap_replicates":N_BOOT,"primary_selection":"all_ok_rmsd_3A_structural_interface_qc",
              "pairing":"protocol-specific seed summaries; all model/recycle observations retained within seed",
              "vanilla_exact_row_matches":22320,"masked_exact_row_matches":24000,
              "dssp":"unavailable; no DSSP claims made"}

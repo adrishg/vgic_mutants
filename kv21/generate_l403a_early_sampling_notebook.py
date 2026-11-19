@@ -7,7 +7,7 @@ path=root/'kv21'/'Kv21_L403A_early_sampling_analysis.ipynb'
 nb=nbf.v4.new_notebook(); c=[]
 c.append(nbf.v4.new_markdown_cell("""# Kv2.1 L403A: equal-depth sampling and early access to shifted S6 geometry
 
-This analysis tests two distinct hypotheses using the established `all_ok_rmsd_3A_structural_interface_alignment_qc` subset:
+This analysis tests two distinct hypotheses using the established `all_ok_rmsd_3A_structural_interface_qc` subset:
 
 1. Does targeted masking produce broader L403A S6 sampling at equal sampling depth?
 2. Does targeted masking reach 8SDA-like S6 geometry earlier?

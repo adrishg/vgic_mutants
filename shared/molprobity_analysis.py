@@ -21,7 +21,7 @@ import statsmodels.formula.api as smf
 
 from shared import data_access
 from shared.data_access import resolve
-from shared.dataset_selection import kv21_active_masked_distance_path, select_manifest_rows
+from shared.dataset_selection import filtered_masked_distance_path, kv21_active_masked_distance_path, select_manifest_rows
 from shared.distribution_statistics import parse_trajectory_metadata
 from shared.paired_seed_statistics import paired_common_seed_bootstrap
 from shared.plotting import (CAV12_PALETTE, KV21_PALETTE, NAV15_PALETTE,
@@ -242,16 +242,16 @@ def select_cohorts(data, channel, out):
     for ensemble, part in good.groupby('ensemble', sort=False):
         genotype, protocol = ensemble.split(' | ')
         if channel == 'kv21':
-            if protocol == 'masked':
-                rel = kv21_active_masked_distance_path(ROOT, genotype)
+            if protocol.startswith('masked'):
+                rel = filtered_masked_distance_path(ROOT, 'kv21', genotype)
             else:
                 rel = Path(
                     f'kv21/dataDistances/26-02-11_Kv2.1_{genotype.lower()}_'
-                    f'{protocol}AF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv'
+                    f'{protocol}AF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv'
                 )
             q = pd.read_csv(resolve(rel), usecols=['pdb_file'])
             names = q.pdb_file.map(lambda x: Path(x).name)
-            selection = '3 Å + structural/interface/alignment QC'
+            selection = '3 Å + G377/pore–VSD interface QC'
         else:
             token = _convergence_token(channel, protocol, part)
             rel = f'{channel}/rmsd_convergence_filtering/{PREFIX[channel]}_rmsd_convergence_{genotype.lower()}_{token}/all_models_manifest.csv'

@@ -6,7 +6,7 @@ root=Path(__file__).resolve().parents[1]; path=root/'kv21'/'Kv21_L403A_all_dista
 nb=nbf.v4.new_notebook(); c=[]
 c.append(nbf.v4.new_markdown_cell("""# Kv2.1 L403A: all-distance sampling breadth at equal depth
 
-This notebook expands the S6-focused sampling analysis to the 546 chain-label-safe intrachain distances shared by the established `all_ok_rmsd_3A_structural_interface_alignment_qc` L403A ensembles: 273 Cα distances and 273 shortest non-hydrogen distances. Raw interchain distances are excluded because Kv2.1 homotetramer chain labels can permute.
+This notebook expands the S6-focused sampling analysis to the 546 chain-label-safe intrachain distances shared by the established `all_ok_rmsd_3A_structural_interface_qc` L403A ensembles: 273 Cα distances and 273 shortest non-hydrogen distances. Raw interchain distances are excluded because Kv2.1 homotetramer chain labels can permute.
 
 It asks whether targeted MSA masking broadens the structural ensemble, whether that effect is detectable in the fixed First100 cohort (20 random seeds × five AlphaFold2 model parameterizations), and how closely First100 results reproduce the complete 100-seed ensemble."""))
 c.append(nbf.v4.new_markdown_cell("""## Statistical design

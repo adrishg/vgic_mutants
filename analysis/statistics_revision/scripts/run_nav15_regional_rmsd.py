@@ -323,9 +323,11 @@ def seed_block_analysis(
     definitions: pd.DataFrame,
     *,
     bootstrap: int,
+    reference_ids: list[str] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     table = pd.read_csv(table_path)
-    reference_ids = [str(value) for value in np.load(REFERENCE_PATH)["reference_ids"]]
+    if reference_ids is None:
+        reference_ids = [str(value) for value in np.load(REFERENCE_PATH)["reference_ids"]]
     effects, sensitivities = [], []
     comparison_index = 0
     for sequence in ("wt", "qqq"):
@@ -509,15 +511,74 @@ def write_run_summary(
     )
 
 
+# Regions of the 50% Hive RMSD table used for each supplementary region when the
+# aligned NaV1.5 coordinate arrays (vanilla included) are not available locally.
+TABLE_REGION_MAP = {
+    "pore_s5_s6_helices": ("pore_domain__ca__core_aligned_rmsd_A", "Pore domain (Hive table region)"),
+    "dii_s6": ("DII_s6__ca__core_aligned_rmsd_A", "DII S6"),
+    "ifm_motif": ("ifm_motif__ca__core_aligned_rmsd_A", "IFM/QQQ motif"),
+    "ifm_receptor_set": ("ifm_receptor_pocket__ca__core_aligned_rmsd_A", "IFM receptor pocket"),
+}
+TABLE_DATASETS = {
+    "wt_vanilla": "wt_vanilla", "wt_masked_v1_50pct": "wt_masked",
+    "qqq_vanilla": "qqq_vanilla", "qqq_masked_v1_50pct": "qqq_masked",
+}
+
+
+def per_structure_from_rmsd_table(source: Path, output: Path) -> tuple[Path, pd.DataFrame, list[str]]:
+    """Pivot the All-OK-3 50% Hive RMSD table into the per-structure layout."""
+    columns = ["dataset", "pdb_file", "seed", "model_number", "recycle_index", "reference_id", "analysis_status"]
+    values = [column for column, _ in TABLE_REGION_MAP.values()]
+    long = pd.read_csv(source, usecols=columns + values, low_memory=False)
+    long = long[long["dataset"].isin(TABLE_DATASETS) & long["analysis_status"].eq("ok")].copy()
+    long["dataset"] = long["dataset"].map(TABLE_DATASETS)
+    long = long.rename(columns={"recycle_index": "recycle_number"})
+    reference_ids = sorted(long["reference_id"].astype(str).unique())
+    wide = long.pivot_table(
+        index=["dataset", "pdb_file", "seed", "model_number", "recycle_number"],
+        columns="reference_id", values=values, aggfunc="first",
+    )
+    region_of = {column: region for region, (column, _) in TABLE_REGION_MAP.items()}
+    wide.columns = [f"{ref}__{region_of[col]}__rmsd_A" for col, ref in wide.columns]
+    wide = wide.reset_index()
+    for ref in reference_ids:  # keep reference/region cells that are wholly unavailable
+        for region in TABLE_REGION_MAP:
+            column = f"{ref}__{region}__rmsd_A"
+            if column not in wide:
+                wide[column] = np.nan
+    table_path = output / "nav15_regional_rmsd_per_structure_from_rmsd_table.csv.gz"
+    wide.to_csv(table_path, index=False)
+    definitions = pd.DataFrame([
+        {"region_id": region, "region_label": label, "label": label, "source_column": column,
+         "provenance": str(source.name)}
+        for region, (column, label) in TABLE_REGION_MAP.items()
+    ])
+    definitions.to_csv(output / "nav15_regional_rmsd_region_definitions.csv", index=False)
+    return table_path, definitions, reference_ids
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--mode", choices=("exploratory", "publication"), default="publication")
     parser.add_argument("--chunk-size", type=int, default=500)
+    parser.add_argument("--from-rmsd-table", type=Path, default=None,
+                        help="Use the All-OK-3 RMSD table instead of the aligned arrays.")
     args = parser.parse_args()
     output = args.output_dir if args.output_dir.is_absolute() else ROOT / args.output_dir
     output.mkdir(parents=True, exist_ok=True)
     bootstrap = 500 if args.mode == "exploratory" else 2_000
+    if args.from_rmsd_table is not None:
+        from shared import data_access
+        table_path, definitions, reference_ids = per_structure_from_rmsd_table(
+            data_access.resolve(args.from_rmsd_table), output
+        )
+        effects, _ = seed_block_analysis(
+            table_path, output, definitions, bootstrap=bootstrap, reference_ids=reference_ids
+        )
+        plot_effects(effects, output)
+        print(f"NaV1.5 regional RMSD (table mode) completed: {output}")
+        return
 
     table_path, metadata, validation = write_per_structure_table(
         output, chunk_size=args.chunk_size

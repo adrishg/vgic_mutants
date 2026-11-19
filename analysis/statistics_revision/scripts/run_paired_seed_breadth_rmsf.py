@@ -157,6 +157,8 @@ def rmsf(output: Path, bootstrap: int) -> None:
     coords = np.load(resolve_local_lfs_object(merged / "kv21_aligned_ca_coordinates.npy", ROOT), mmap_mode="r")
     present = np.load(resolve_local_lfs_object(merged / "kv21_aligned_ca_present.npy", ROOT), mmap_mode="r")
     selected = _selected_rmsf_rows(metadata)
+    # 50% release labels the masked cohort ``masked_v3_50pct``.
+    selected["protocol"] = selected["protocol"].astype(str).str.replace(r"^masked.*", "masked", regex=True)
     profile = read_csv_resolving_lfs(
         ROOT / "kv21/dataRMSF/profiles/kv21_all_ok_3_symmetry_averaged_profiles.csv", ROOT
     )

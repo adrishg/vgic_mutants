@@ -10,7 +10,7 @@ cells.append(nbf.v4.new_markdown_cell("""# Kv2.1 L403A conformational validation
 
 This notebook tests the controlled question: **does the protocol-matched WT → L403A conformational shift reproduce the direction and magnitude of the experimental 8SD3 → 8SDA shift better under targeted masking than under vanilla AF2?**
 
-Only the existing validated conformational-metric CSVs are used; no PDB-derived metric is recalculated. The primary prediction subset is the repository's established `all_ok_rmsd_3A_structural_interface_alignment_qc` selection used for distance analysis. Exact PDB basenames are joined one-to-one and condition/protocol/seed/model/recycle metadata are checked. Subunits A–D remain separate."""))
+Only the existing validated conformational-metric CSVs are used; no PDB-derived metric is recalculated. The primary prediction subset is the repository's established `all_ok_rmsd_3A_structural_interface_qc` selection used for distance analysis. Exact PDB basenames are joined one-to-one and condition/protocol/seed/model/recycle metadata are checked. Subunits A–D remain separate."""))
 cells.append(nbf.v4.new_code_cell("""from pathlib import Path
 import sys, json
 import pandas as pd

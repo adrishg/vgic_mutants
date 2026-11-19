@@ -24,7 +24,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from shared.data_access import resolve
-from shared.dataset_selection import cav12_active_masked_distance_path, kv21_active_masked_distance_path, nav15_active_masked_distance_path
+from shared.dataset_selection import filtered_masked_distance_path, cav12_active_masked_distance_path, kv21_active_masked_distance_path, nav15_active_masked_distance_path
 
 repo_root = Path.cwd() if (Path.cwd()/'shared').is_dir() else Path.cwd().parent
 from shared.plotting import CAV12_PALETTE, KV21_PALETTE, NAV15_PALETTE
@@ -36,11 +36,11 @@ FIG.mkdir(parents=True, exist_ok=True)
 TAB.mkdir(parents=True, exist_ok=True)"""),
     nbf.v4.new_markdown_cell("## Final-QC datasets"),
     nbf.v4.new_code_cell("""DATASETS = {
-    'CaV1.2 WT': {'channel':'CaV1.2','condition':'WT','vanilla':resolve('cav12/dataDistances/26-02-10_Cav12_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv'),'masked':resolve(cav12_active_masked_distance_path(repo_root, 'WT'))},
-    'Kv2.1 WT': {'channel':'Kv2.1','condition':'WT','vanilla':resolve('kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv'),'masked':resolve(kv21_active_masked_distance_path(repo_root, 'WT'))},
-    'Kv2.1 L403A': {'channel':'Kv2.1','condition':'L403A','vanilla':resolve('kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv'),'masked':resolve(kv21_active_masked_distance_path(repo_root, 'L403A'))},
-    'Kv2.1 F412L': {'channel':'Kv2.1','condition':'F412L','vanilla':resolve('kv21/dataDistances/26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv'),'masked':resolve(kv21_active_masked_distance_path(repo_root, 'F412L'))},
-    'NaV1.5 QQQ': {'channel':'NaV1.5','condition':'QQQ','vanilla':resolve('nav15/dataDistances/26-07-27_Nav15_qqq_vanilla_AF2_distances_all_ok_rmsd_3A.csv'),'masked':resolve(nav15_active_masked_distance_path(repo_root, 'QQQ', 'v1'))},
+    'CaV1.2 WT': {'channel':'CaV1.2','condition':'WT','vanilla':resolve('cav12/dataDistances/26-02-10_Cav12_wt_vanillaAF2_distances_all_ok_rmsd_3A.csv'),'masked':resolve(filtered_masked_distance_path(repo_root, 'cav12', 'WT'))},
+    'Kv2.1 WT': {'channel':'Kv2.1','condition':'WT','vanilla':resolve('kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv'),'masked':resolve(filtered_masked_distance_path(repo_root, 'kv21', 'WT'))},
+    'Kv2.1 L403A': {'channel':'Kv2.1','condition':'L403A','vanilla':resolve('kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv'),'masked':resolve(filtered_masked_distance_path(repo_root, 'kv21', 'L403A'))},
+    'Kv2.1 F412L': {'channel':'Kv2.1','condition':'F412L','vanilla':resolve('kv21/dataDistances/26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv'),'masked':resolve(filtered_masked_distance_path(repo_root, 'kv21', 'F412L'))},
+    'NaV1.5 QQQ': {'channel':'NaV1.5','condition':'QQQ','vanilla':resolve('nav15/dataDistances/26-07-27_Nav15_qqq_vanilla_AF2_distances_all_ok_rmsd_3A.csv'),'masked':resolve(filtered_masked_distance_path(repo_root, 'nav15', 'QQQ', 'v1'))},
 }
 path_audit=pd.DataFrame([{'dataset':name,'protocol':protocol,'path':str(cfg[protocol]),'exists':cfg[protocol].is_file()} for name,cfg in DATASETS.items() for protocol in ('vanilla','masked')])
 display(path_audit)

@@ -34,7 +34,8 @@ def build_table() -> pd.DataFrame:
         for sequence in sequences:
             row = selected[
                 selected.A.eq(f"{sequence} | vanilla")
-                & selected.B.eq(f"{sequence} | masked")
+                # 50% Kv2.1/CaV1.2 cohorts are labelled ``masked v3``.
+                & selected.B.isin([f"{sequence} | masked", f"{sequence} | masked v3"])
             ].iloc[0]
             rows.append({
                 "channel": display,

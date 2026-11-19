@@ -114,6 +114,40 @@ def kv21_active_masked_distance_path(
     return Path(str(rows.iloc[0]["distance_relpath"]))
 
 
+PUBLICATION_FILTER_SUFFIX = {
+    "kv21": "_all_ok_rmsd_3A_structural_interface_qc.csv",
+    "nav15": "_all_ok_rmsd_3A.csv",
+    "cav12": "_all_ok_rmsd_3A.csv",
+}
+
+
+def filtered_masked_distance_path(
+    repo_root: str | Path, channel: str, condition: str, variant: str = "v1"
+) -> Path:
+    """Return the publication-filtered table for a registered 50% masked cohort.
+
+    The registry points at the complete (unfiltered) export. Every figure uses
+    the filtered companion instead: All-OK-3 convergence for NaV1.5 and
+    CaV1.2, plus the G377 and 27 Å pore–VSD interface checks for Kv2.1
+    (``scripts/filtering/build_kv21_structural_interface_qc_50pct.py``), so
+    vanilla and masked share one definition.
+    """
+    key = str(channel).lower().replace(".", "")
+    if key == "kv21":
+        original = kv21_active_masked_distance_path(repo_root, condition)
+    elif key == "nav15":
+        original = nav15_active_masked_distance_path(repo_root, condition, variant)
+    elif key == "cav12":
+        original = cav12_active_masked_distance_path(repo_root, condition)
+    else:
+        raise ValueError(f"Unknown channel {channel!r}")
+    original = Path(original)
+    stem = original.stem
+    while stem.endswith("_all"):
+        stem = stem[:-4]
+    return original.with_name(stem + PUBLICATION_FILTER_SUFFIX[key])
+
+
 def _kv21_active_manifest_row(repo_root: str | Path, condition: str) -> pd.Series:
     aliases = {"wt": "WT", "l403a": "L403A", "f412l": "F412L"}
     condition_key = aliases.get(str(condition).lower(), str(condition))

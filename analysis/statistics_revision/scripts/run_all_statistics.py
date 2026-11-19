@@ -282,7 +282,7 @@ def l403a_analysis(repo_root: Path, output: Path, seed: int) -> pd.DataFrame:
 
 
 def f412l_analysis(repo_root: Path, output: Path, seed: int) -> pd.DataFrame:
-    source = repo_root / "kv21/dataRMSD/analysis/comparison_v5/f412l_pocket_D_paper_nexus_shortest_contacts_long_v5.csv"
+    source = repo_root / "kv21/dataDistances/analysis/F412L_nexus_shortest_contacts_long.csv"
     frame = read_csv(source, repo_root)
     value = "Shortest heavy-atom distance (Å)"
     require_columns(frame, ["Protocol", "pdb_file", "Contact", value], source)

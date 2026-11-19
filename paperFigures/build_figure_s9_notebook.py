@@ -54,7 +54,7 @@ FIG_DIR.mkdir(parents=True, exist_ok=True)
 TAB_DIR.mkdir(parents=True, exist_ok=True)
 
 ORIGINAL_PATHS = {
-    ('WT', 'vanilla'): Path('kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2test_distances_all.csv'),
+    ('WT', 'vanilla'): Path('kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2_distances_all.csv'),
     ('WT', 'masked'): kv21_active_masked_distance_path(repo_root, 'WT'),
     ('L403A', 'vanilla'): Path('kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all.csv'),
     ('L403A', 'masked'): kv21_active_masked_distance_path(repo_root, 'L403A'),
@@ -63,7 +63,7 @@ DATASETS = {
     key: load_selected_distance_csv(
         f'{key[0]} {key[1]}',
         distance_csv_options(repo_root, path, 'kv21', key[0], key[1]),
-        'all_ok_3',
+        'all_ok_3_structural_interface_qc',
         fallback_to_all=False,
     )
     for key, path in ORIGINAL_PATHS.items()

@@ -23,9 +23,14 @@ def apply_kv21_rmsd_qc(
     frame: pd.DataFrame,
     repo_root: str | Path,
     *,
-    stable_core_failure_cutoff_A: float = 4.0,
+    stable_core_failure_cutoff_A: float | None = None,
 ) -> pd.DataFrame:
-    """Apply the independent Kv2.1 structural and v2 alignment QC.
+    """Apply the independent Kv2.1 structural and (optional) v2 alignment QC.
+
+    The 50% release uses one definition for vanilla and masked: All-OK-3
+    convergence, G377 ring integrity and the 27 Å pore–VSD interface check
+    (``*_structural_interface_qc`` allowlists). The stable-core alignment
+    cutoff is applied only when ``stable_core_failure_cutoff_A`` is given.
 
     The allOK3 filter establishes convergence within a prediction trajectory;
     it does not guarantee a physically assembled tetramer. This filter first
@@ -55,7 +60,7 @@ def apply_kv21_rmsd_qc(
     # Named explicitly rather than discovered by glob: the allowlists are
     # published in the companion dataset and need not be present on disk.
     from . import data_access
-    from .dataset_selection import kv21_active_masked_distance_path
+    from .dataset_selection import filtered_masked_distance_path
 
     allowlists: dict[tuple[str, str], set[str]] = {}
     for condition in ("wt", "l403a", "f412l"):
@@ -64,7 +69,7 @@ def apply_kv21_rmsd_qc(
             if protocol == "masked":
                 try:
                     resolved = data_access.resolve(
-                        kv21_active_masked_distance_path(repo_root, condition)
+                        filtered_masked_distance_path(repo_root, "kv21", condition)
                     )
                 except (FileNotFoundError, data_access.DataUnavailable):
                     resolved = None
@@ -73,7 +78,7 @@ def apply_kv21_rmsd_qc(
                     f"kv21/dataDistances/26-02-11_Kv2.1_{condition}_{protocol}AF2"
                     "_distances_all_ok_rmsd_3A_structural_interface"
                 )
-                for suffix in ("_alignment_qc.csv", "_qc.csv"):
+                for suffix in ("_qc.csv",):
                     try:
                         resolved = data_access.resolve(stem + suffix)
                         break
@@ -82,7 +87,7 @@ def apply_kv21_rmsd_qc(
             if resolved is None:
                 raise FileNotFoundError(
                     f"No Kv2.1 structural-interface allowlist for "
-                    f"{condition}/{protocol}; looked for {stem}_alignment_qc.csv"
+                    f"{condition}/{protocol}; looked for {stem}_qc.csv"
                 )
             values = pd.read_csv(
                 resolved, usecols=["pdb_file"]
@@ -103,10 +108,14 @@ def apply_kv21_rmsd_qc(
     core = pd.to_numeric(
         after_interface["selected_core_postfit_rmsd_A"], errors="coerce"
     )
-    failed_trajectories = set(
-        after_interface.loc[
-            core.ge(stable_core_failure_cutoff_A) | core.isna(), "_trajectory"
-        ]
+    failed_trajectories = (
+        set(
+            after_interface.loc[
+                core.ge(stable_core_failure_cutoff_A) | core.isna(), "_trajectory"
+            ]
+        )
+        if stable_core_failure_cutoff_A is not None
+        else set()
     )
     result = after_interface.loc[
         ~after_interface["_trajectory"].isin(failed_trajectories)
@@ -118,14 +127,19 @@ def apply_kv21_rmsd_qc(
     result.attrs["kv21_alignment_qc_rejected_rows"] = int(
         len(after_interface) - len(result)
     )
-    result.attrs["kv21_stable_core_failure_cutoff_A"] = float(
-        stable_core_failure_cutoff_A
+    result.attrs["kv21_stable_core_failure_cutoff_A"] = (
+        float(stable_core_failure_cutoff_A)
+        if stable_core_failure_cutoff_A is not None else None
+    )
+    cutoff_note = (
+        f"stable-core cutoff {stable_core_failure_cutoff_A:g} Å"
+        if stable_core_failure_cutoff_A is not None else "no stable-core cutoff"
     )
     print(
         f"Kv2.1 structural RMSD QC: {len(frame):,} rows → "
         f"{len(after_interface):,} after tetramer/interface QC → {len(result):,} "
-        f"after excluding {len(failed_trajectories)} separated alignment-failure "
-        f"trajectories (stable-core cutoff {stable_core_failure_cutoff_A:g} Å)"
+        f"after excluding {len(failed_trajectories)} alignment-failure "
+        f"trajectories ({cutoff_note})"
     )
     return result
 

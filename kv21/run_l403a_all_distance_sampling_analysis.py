@@ -28,7 +28,7 @@ DATA=ROOT/'kv21'/'dataDistances'
 OUT=ROOT/'kv21'/'dataExtra'/'conformation_analysis'/'all_distance_sampling'
 FIG=OUT/'figures'; TAB=OUT/'tables'; FIG.mkdir(parents=True,exist_ok=True); TAB.mkdir(parents=True,exist_ok=True)
 PATHS={
- 'vanilla': 'kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_alignment_qc.csv',
+ 'vanilla': 'kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv',
  'masked': kv21_active_masked_distance_path(ROOT, 'L403A')}
 DEPTHS=[4,8,12,16,20,'Full QC']; FOCAL_DEPTH=20; EPS=1e-9
 

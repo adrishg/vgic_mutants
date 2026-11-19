@@ -77,9 +77,11 @@ def final_selection(repo: Path, channel: str, metadata: pd.DataFrame) -> pd.Data
     config = CHANNEL_CONFIG[channel]
     if channel == "kv21":
         paths = sorted(
-            (repo / "kv21" / "dataDistances").glob(
+            path for path in (repo / "kv21" / "dataDistances").glob(
                 "*_all_ok_rmsd_3A_structural_interface_qc.csv"
             )
+            # Companion ``_extra_`` tables share the model keys; count each cohort once.
+            if "_extra_" not in path.name
         )
         if len(paths) != 6:
             raise FileNotFoundError(
