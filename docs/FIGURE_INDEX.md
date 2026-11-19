@@ -6,6 +6,7 @@
 - Figure 5 F412L panel: `analysis/statistics_revision/figures/Figure5_F412L_mutation_site_cleaned.{png,pdf}`. Partner labels retain chain identity. Source data are in `paired_seed_v2/source_data/figure5_*`.
 - Figure 6 mask/reference metadata: `analysis/statistics_revision/tables/Figure6_mask_and_reference_markers.tsv`.
 - Figure 7: `analysis/statistics_revision/figures/Figure7_Cav12_matched_G402S_R406_screen.{png,pdf}`. Panel D uses all 17 atom-matched position-402 Cα pairs; panel E uses the coordinate-derived side-chain-heavy R406 screen and reports conditional contact numerators and denominators.
+- Kv2.1 mutation-effect direction: `analysis/statistics_revision/kv21_landmark_direction/kv21_landmark_direction.{png,pdf}`, with per-coordinate, summary, within-background displacement and ordered-interface tables beside it. Regenerate with `analysis/statistics_revision/scripts/run_kv21_landmark_direction.py`. This is the source for the main-text pore-VSD landmark result and for the S6 cross-pore-ring specificity control.
 - Cross-channel global clashscore: `analysis/statistics_revision/figures/cross_channel_clashscore_absolute_means.{png,pdf}`.
 
 The shared sequence/protocol palette is listed in `palette.txt` and implemented
