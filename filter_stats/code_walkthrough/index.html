@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pipeline Code Walkthroughs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column; the five files run down a numbered track, because they are a real sequence. */
+:root {
+  --bg: #f2f4f7; --surface: #ffffff; --surface-2: #f3f5f9; --ink: #18202b; --muted: #556070; --faint: #aab2be;
+  --rule: #d8dde6; --accent: #2456c9; --accent-ink: #ffffff; --hl: #fff0b8; --hl-bar: #cf8f00;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1218; --surface: #151a22; --surface-2: #1b212c; --ink: #e3e7ee; --muted: #9ba4b3; --faint: #535c6b;
+    --rule: #29303d; --accent: #82a8ff; --accent-ink: #0e1218; --hl: #3b3213; --hl-bar: #e6b43a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1218; --surface: #151a22; --surface-2: #1b212c; --ink: #e3e7ee; --muted: #9ba4b3; --faint: #535c6b;
+  --rule: #29303d; --accent: #82a8ff; --accent-ink: #0e1218; --hl: #3b3213; --hl-bar: #e6b43a; color-scheme: dark;
+}
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+*, *::before, *::after { box-sizing: border-box; }
+main { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 34px; }
+h1 { margin: 0; font: 600 28px/1.2 var(--sans); letter-spacing: -0.015em; text-wrap: balance; }
+h2 { margin: 0; font: 600 18px/1.3 var(--sans); text-wrap: balance; }
+p { margin: 0; max-width: 66ch; }
+code { font: 0.9em var(--mono); background: var(--surface-2); padding: 1px 4px; border-radius: 3px; }
+a { color: var(--accent); }
+.lead { color: var(--muted); font-size: 16px; }
+header { display: flex; flex-direction: column; gap: 12px; }
+.eyebrow { font: 600 11.5px/1 var(--sans); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+section { display: flex; flex-direction: column; gap: 14px; }
+.track { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.stage { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 0 14px; }
+.rail { display: flex; flex-direction: column; align-items: center; }
+.num {
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  font: 600 14px var(--mono); background: var(--accent); color: var(--accent-ink);
+}
+.line { flex: 1; width: 2px; background: var(--rule); min-height: 18px; }
+.stage:last-child .line { display: none; }
+.card {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; margin-bottom: 8px;
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+}
+.card-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.file { font: 600 16px var(--mono); }
+.count { font: 12.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.job { color: var(--ink); }
+.io { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; font-size: 13px; color: var(--muted); }
+.io dt { font-weight: 600; }
+.io dd { margin: 0; font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.open {
+  align-self: flex-start; font: 500 13.5px/1 var(--sans); padding: 9px 14px; border-radius: 6px; text-decoration: none;
+  background: var(--accent); color: var(--accent-ink);
+}
+.open:hover { filter: brightness(1.08); }
+.open:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.handoff { font: 12px var(--mono); color: var(--muted); padding: 2px 0 10px; }
+.journey { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.jrow { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: 4px 14px; padding: 11px 14px; border-top: 1px solid var(--rule); }
+.jrow:first-child { border-top: 0; }
+.jrow .who { font: 600 13px var(--mono); }
+.jrow .what { font-size: 14px; }
+@media (max-width: 560px) { .jrow { grid-template-columns: minmax(0, 1fr); } }
+ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 5px; max-width: 66ch; }
+.note { font-size: 13.5px; color: var(--muted); }
+.callout { background: var(--surface); border: 1px solid var(--rule); border-left: 3px solid var(--hl-bar); border-radius: 6px; padding: 12px 14px; font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="eyebrow">Structural-diversity pipeline · code walkthroughs</span>
+    <h1>The pipeline's code, one statement at a time</h1>
+    <p class="lead">Five step-through pages, one per file, in the order the pipeline runs them. Each page ran the real
+      file, unchanged, on the same small made-up dataset, and shows every statement with the values it produced. What
+      one step writes is what the next step reads.</p>
+  </header>
+
+  <section aria-labelledby="h-files">
+    <h2 id="h-files">The five files</h2>
+    <ol class="track">
+      <li class="stage">
+        <div class="rail"><span class="num">1</span><span class="line"></span></div>
+        <div>
+          <article class="card">
+            <div class="card-top"><span class="file">config.py</span><span class="count">401 steps</span></div>
+            <p class="job">Reads and checks the dataset config.</p>
+            <dl class="io"><dt>Reads</dt><dd>toy.toml, uniprot.fasta, omit.csv</dd><dt>Writes</dt><dd>a Config object (nothing on disk)</dd></dl>
+            <a class="open" href="pages/config.html">Open the config.py walkthrough</a>
+          </article>
+          <div class="handoff">↓ passes on the Config every step loads first</div>
+        </div>
+      </li>
+      <li class="stage">
+        <div class="rail"><span class="num">2</span><span class="line"></span></div>
+        <div>
+          <article class="card">
+            <div class="card-top"><span class="file">build_dv.py</span><span class="count">1,479 steps</span></div>
+            <p class="job">Step 1: reads the archives, numbers and superposes the models, computes the DVs.</p>
+            <dl class="io"><dt>Reads</dt><dd>the archives, reference.pdb</dd><dt>Writes</dt><dd>results/aligned/, report/, parse/</dd></dl>
+            <a class="open" href="pages/build_dv.html">Open the build_dv.py walkthrough</a>
+          </article>
+          <div class="handoff">↓ passes on aligned/ · one row per model, fitted coordinates</div>
+        </div>
+      </li>
+      <li class="stage">
+        <div class="rail"><span class="num">3</span><span class="line"></span></div>
+        <div>
+          <article class="card">
+            <div class="card-top"><span class="file">screen.py</span><span class="count">553 steps</span></div>
+            <p class="job">The topology screen: removes models with the wrong fold.</p>
+            <dl class="io"><dt>Reads</dt><dd>results/aligned/</dd><dt>Writes</dt><dd>results/screen/</dd></dl>
+            <a class="open" href="pages/screen.html">Open the screen.py walkthrough</a>
+          </article>
+          <div class="handoff">↓ passes on screen/verdicts.csv · kept or removed</div>
+        </div>
+      </li>
+      <li class="stage">
+        <div class="rail"><span class="num">4</span><span class="line"></span></div>
+        <div>
+          <article class="card">
+            <div class="card-top"><span class="file">region_dv.py</span><span class="count">532 steps</span></div>
+            <p class="job">Step 2: the DVs of each region, on the kept models.</p>
+            <dl class="io"><dt>Reads</dt><dd>results/aligned/, screen/, parse/</dd><dt>Writes</dt><dd>results/regions/</dd></dl>
+            <a class="open" href="pages/region_dv.html">Open the region_dv.py walkthrough</a>
+          </article>
+          <div class="handoff">↓ passes on regions/dv.csv · the DVs per region</div>
+        </div>
+      </li>
+      <li class="stage">
+        <div class="rail"><span class="num">5</span><span class="line"></span></div>
+        <div>
+          <article class="card">
+            <div class="card-top"><span class="file">stats.py</span><span class="count">389 steps</span></div>
+            <p class="job">Step 3: the mixed model and the comparisons with the control.</p>
+            <dl class="io"><dt>Reads</dt><dd>results/regions/, screen/</dd><dt>Writes</dt><dd>results/stats/</dd></dl>
+            <a class="open" href="pages/stats.html">Open the stats.py walkthrough</a>
+          </article>
+          
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="h-journey">
+    <h2 id="h-journey">Follow one model through the pipeline</h2>
+    <p>WT network 2, seed 1, at recycle 1 was built to be misfolded: every voltage sensor sits on its own pore domain
+      instead of its neighbour's. Here is what each step does with it.</p>
+    <div class="journey"><div class="jrow"><span class="who">build_dv.py</span><span class="what">Its spread is <b>10.61 Å</b>. Spread is measured from the group's average model, which includes this one, so the other five WT models at recycle 1 read high too (2.16–2.33 Å), and the group's mean spread is 3.66 Å.</span></div><div class="jrow"><span class="who">screen.py</span><span class="what"><b>wiring = 0</b> of 4 voltage sensors on the right pore domain, so it fails and is removed (reason: wiring). The same prediction passes at recycle 2.</span></div><div class="jrow"><span class="who">region_dv.py</span><span class="what">WT recycle 1 is relabelled and refitted without it. Network 2 keeps 2 models (seeds 0, 2), each now with spread 0.47 Å. With two models, both sit the same distance from their mean.</span></div><div class="jrow"><span class="who">stats.py</span><span class="what">spread_VSD, R18Q vs WT at recycle 1: ratio 1.48, t = 14.0, but the cutoff is 72 with df = 1, so it is not significant (a limit of the tiny design).</span></div></div>
+  </section>
+
+  <section aria-labelledby="h-toy">
+    <h2 id="h-toy">The toy dataset</h2>
+    <ul><li>A made-up four-chain channel of 43 residues (chains A–D), drawn as a cartoon of a voltage-gated channel: each subunit's voltage sensor (S1–S4) sits next to its clockwise neighbour's pore domain (S5–S6).</li><li>2 conditions: <code>WT</code> (the control) and the mutant <code>R18Q</code> (UniProt residue 18, in S4).</li><li>2 networks (ColabFold <code>model_1</code>, <code>model_2</code>) × 3 seeds × recycles 0, 1, 2: 18 models per condition. A fourth seed of model 2 stopped early (no recycle 2), so it is left out.</li><li>A reference structure numbered UniProt + 100, missing residue 12, with an extra toxin chain E and waters and a calcium ion in chain W.</li><li>Built in: R18Q's voltage sensor is looser (more spread), network 2 has a small systematic error, and errors shrink with each recycle. WT model 2 seed 1 is misfolded at recycle 1 (every voltage sensor on its own pore domain), and <code>omit.csv</code> names R18Q model 1 seed 2 for removal by hand.</li><li>Everything was made by <code>toy_data/make_toy_data.py</code>; it is small enough to read on screen, not realistic.</li></ul>
+    <p class="callout">The dataset is tiny so that every table fits on screen. That makes some numbers unrealistic,
+      above all in stats.py, where 2 conditions and 2 networks leave 1 degree of freedom and nothing can reach
+      significance.</p>
+  </section>
+
+  <section aria-labelledby="h-use">
+    <h2 id="h-use">Using a walkthrough</h2>
+    <ul>
+      <li><b>Next</b> (or →) runs one statement and goes inside every function it calls; <b>Back</b> (or ←) undoes it.</li>
+      <li><b>Skip call</b> runs the function about to be entered in one go; <b>Finish function</b> jumps to the value the current function returns.</li>
+      <li><b>Jump to</b> lists every function call that is stepped through; clicking a line number goes to the next time that line runs.</li>
+      <li>Each page opens on its inputs and ends on the files it wrote.</li>
+    </ul>
+    <p class="note">Each page is one self-contained HTML file that works offline. The folder <code>code_tutor/</code>
+      beside the pipeline's files holds the toy data, the scripts that made these pages, and a README on rebuilding
+      them or making one for another file.</p>
+  </section>
+</main>
+</body>
+</html>
