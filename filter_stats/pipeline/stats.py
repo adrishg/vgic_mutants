@@ -81,6 +81,29 @@ STEP_ERRORS = (StatsInputError, StatsDesignError, *STEP1_ERRORS)
 
 # =========================================================================== one value per group
 
+OFFSET_TOLERANCE = 1e-6           # an offset is the group's one distance to the structure: the same for every model
+
+
+def _group_offset(x: np.ndarray, measure: str, cond: str, net: str, rec: int) -> float:
+    """The group's offset, which is one value shared by all its models (D-074).
+
+    The group's mean is returned rather than an arbitrary member's, and a group whose members disagree by
+    more than OFFSET_TOLERANCE is an error rather than a silent pick of whichever model groupby ordered
+    first: that disagreement means the grouping key no longer matches the region the offset was measured
+    over, and the whole measure would be wrong in a way nothing downstream could see."""
+    finite = x[np.isfinite(x)]
+    if len(finite) == 0:
+        return float("nan")
+    spread = float(finite.max() - finite.min())
+    if spread > OFFSET_TOLERANCE:
+        raise StatsInputError(
+            f"{measure}: the group (condition {cond!r}, network {net!r}, recycle {rec}) holds {len(finite)} models "
+            f"whose offsets differ by {spread:.3g} A, more than the {OFFSET_TOLERANCE:g} A an offset is allowed to "
+            f"vary within a group. An offset is one distance per group, so this means the grouping key and the "
+            f"region the offset was measured over no longer agree.")
+    return float(finite.mean())
+
+
 def group_values(dv: pd.DataFrame, measures: list, first_recycle: int = 1) -> pd.DataFrame:
     """One row per group (condition, network, recycle >= first_recycle): pair, number of models and each
     measure's value. first_recycle must match the screen's, or the statistics analyse a different set
@@ -92,7 +115,7 @@ def group_values(dv: pd.DataFrame, measures: list, first_recycle: int = 1) -> pd
         for m in measures:
             x = g[m].to_numpy(dtype=float)
             if m.startswith("offset"):
-                row[m] = float(x[0])                                        # one value for the whole group
+                row[m] = _group_offset(x, m, cond, net, rec)                # one value for the whole group
             else:
                 row[m] = float(np.sqrt(np.mean(x ** 2))) if len(g) >= 2 else np.nan
         rows.append(row)
