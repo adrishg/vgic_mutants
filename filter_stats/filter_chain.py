@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""The Kv2.1 quality-control chain, in the one order that is defensible.
+"""The quality-control chain, in the one order that is defensible.
 
     1. all-OK-3 convergence          earliest recycle from which every later successive-recycle
                                      transition stays under 3 A; that recycle is the trajectory's
                                      representative, and it and everything after it are retained
-    2. G377 selectivity-filter ring  trajectory rejected if any retained recycle exceeds 20 A
+    2. selectivity-filter ring       trajectory rejected if any retained recycle exceeds 20 A
+                                     (Kv2.1 G377, Cav1.2 EEEE, Nav1.5 DEKA)
     3. pore-VSD interface, 27 A      trajectory level: one bad recycle rejects the whole trajectory
+                                     (Kv2.1 only - no cutoff is published for the other two)
     4. topology screen               Brandon Harris's reference-free checks (filter_stats/pipeline/
                                      screen.py), judging each surviving trajectory's representative
+
+Channel differences - the ring residues, the repeat segments, whether an interface cutoff exists -
+live in channels.py, which also records what was measured about how far each step transfers.
 
 Why this order and not the cheap-screen-first one that looks more attractive. Two reasons, both
 measured in 26-11/filterComparison/FILTER_ORDER_FINDINGS.md section 9, neither of them about cost:
@@ -50,6 +55,9 @@ if str(REPO_ROOT) not in sys.path:
 
 from shared.dataset_selection import apply_kv21_interface_qc           # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from channels import Channel, channel as get_channel                   # noqa: E402
+
 G377_RING_MAX_A = 20.0            # the published selectivity-filter ring cutoff, trajectory level
 INTERFACE_MAX_A = 27.0            # the published pore-VSD interface cutoff, trajectory level
 TOPOLOGY_CHECKS = ("wiring", "box_corners", "s6_on_own_s5")            # the checks needing no reference
@@ -81,7 +89,7 @@ def trajectories(column: pd.Series) -> pd.Series:
 
 
 def ring_columns(frame: pd.DataFrame, position: int) -> list:
-    """The six inter-chain CA-CA columns of the ring at `position`, matched by position only.
+    """The six inter-chain CA-CA columns of a homotetramer's ring at `position`, matched by position.
 
     The column names carry the residue name, which differs between cohorts at any mutated position
     (LEU405 in the wild type, ALA405 in L403A), so a hardcoded name silently returns nothing for one
@@ -92,6 +100,28 @@ def ring_columns(frame: pd.DataFrame, position: int) -> list:
         raise KeyError(f"expected the 6 inter-chain columns of the position-{position} ring, found "
                        f"{len(found)}: {found}")
     return sorted(found)
+
+
+def repeat_ring_columns(frame: pd.DataFrame, residues) -> list:
+    """The six columns of a pseudo-tetramer's filter ring (Nav1.5 DEKA, Cav1.2 EEEE).
+
+    One chain, four non-identical filter residues, so the columns name a pair of residues and the
+    pair can be written either way round."""
+    found = []
+    for first, second in itertools.combinations(residues, 2):
+        options = [f"CA_{first}_CA-{second}_CA", f"CA_{second}_CA-{first}_CA"]
+        here = [c for c in options if c in frame.columns]
+        if not here:
+            raise KeyError(f"the filter ring needs a column for {first}-{second}; tried {options}")
+        found.append(here[0])
+    return found
+
+
+def filter_ring_columns(frame: pd.DataFrame, chan: Channel) -> list:
+    """The channel's six selectivity-filter ring columns, whichever shape its models have."""
+    if chan.ring_residues:
+        return repeat_ring_columns(frame, chan.ring_residues)
+    return ring_columns(frame, chan.ring_position)
 
 
 def _truth(column: pd.Series) -> pd.Series:
@@ -129,24 +159,27 @@ def apply_convergence(distances: pd.DataFrame, convergence: pd.DataFrame) -> tup
 
 # =========================================================================== step 2: the G377 ring
 
-def apply_g377_ring(frame: pd.DataFrame, *, threshold_A: float = G377_RING_MAX_A) -> tuple:
-    """Reject a whole trajectory if any of its retained recycles opens the G377 ring past the cutoff."""
-    columns = [f"CA_CA_{a}_GLY377_CA-{b}_GLY377_CA" for a, b in itertools.combinations("ABCD", 2)]
-    missing = [c for c in columns if c not in frame.columns]
-    if missing:
-        raise KeyError(f"the G377 ring check needs 6 distance columns; missing {missing}")
+def apply_filter_ring(frame: pd.DataFrame, chan: Channel, *, threshold_A: float = None) -> tuple:
+    """Reject a whole trajectory if any retained recycle opens the selectivity-filter ring too far.
+
+    Kv2.1's G377 ring, Cav1.2's EEEE and Nav1.5's DEKA are the same six inter-subunit Ca-Ca
+    distances. The step is kept for all three because it costs nothing, but it is a tripwire: it has
+    never rejected anything in the cohorts measured so far (channels.py, item 1)."""
+    threshold_A = chan.ring_max_A if threshold_A is None else threshold_A
+    columns = filter_ring_columns(frame, chan)
     widest = frame[columns].apply(pd.to_numeric, errors="coerce").max(axis=1)
     failed = set(frame.loc[widest.gt(threshold_A), "trajectory"])
     kept = frame.loc[~frame["trajectory"].isin(failed)].copy()
     kept.attrs.update(frame.attrs)
     return kept, {"trajectories_rejected": len(failed),
                   "models_rejected": int(len(frame) - len(kept)),
-                  "threshold_A": float(threshold_A)}
+                  "threshold_A": float(threshold_A),
+                  "widest_retained_A": float(widest.loc[kept.index].max()) if len(kept) else float("nan")}
 
 
 # =========================================================================== step 4: the topology screen
 
-def _load_ca(path: Path, chains=("A", "B", "C", "D")) -> tuple:
+def _load_ca(path: Path, chains=("A", "B", "C", "D")) -> tuple:  # noqa: D401
     """CA coordinates as (chain, residue, 3) over the union of residue numbers, plus that numbering."""
     per = {c: {} for c in chains}
     with open(path) as handle:
@@ -178,14 +211,18 @@ def _screen_module():
     return screen
 
 
-def judge_topology(paths: dict, *, segments: dict = None, domain_swapped: bool = True,
-                   checks=TOPOLOGY_CHECKS) -> pd.DataFrame:
+def judge_topology(paths: dict, *, chan: Channel = None, segments=None, chains=None,
+                   domain_swapped: bool = True, checks=TOPOLOGY_CHECKS) -> pd.DataFrame:
     """Run the reference-free checks over the given {model file: path} models, one row each.
 
     A model the geometry cannot judge is recorded with an error and `topology_ok` False rather than
     ending the run; on a cohort of several thousand that difference is hours of work."""
     screen = _screen_module()
-    segments = SEGMENTS_MODEL if segments is None else segments
+    if segments is None:
+        segments = (list(chan.segments) if chan is not None and len(chan.segments) > 1
+                    else (chan.segments[0] if chan is not None else SEGMENTS_MODEL))
+    if chains is None:
+        chains = chan.chains if chan is not None else ("A", "B", "C", "D")
     rows = []
     for name in sorted(paths):
         meta = MODEL_META.search(name)
@@ -194,7 +231,7 @@ def judge_topology(paths: dict, *, segments: dict = None, domain_swapped: bool =
                "seed": int(meta.group(2)) if meta else np.nan,
                "recycle": int(meta.group(3)) if meta else np.nan}
         try:
-            coords, numbering = _load_ca(Path(paths[name]))
+            coords, numbering = _load_ca(Path(paths[name]), chains)
             verdict = screen.check_without_reference(
                 screen.split(coords, numbering, segments), domain_swapped, checks)
         except Exception as exc:                                       # one bad model, not a dead job
@@ -220,7 +257,7 @@ def collect_models(model_dir: Path, wanted: set) -> dict:
     return found
 
 
-def apply_topology(representatives: pd.DataFrame, *, model_dir: Path = None,
+def apply_topology(representatives: pd.DataFrame, *, chan: Channel = None, model_dir: Path = None,
                    verdicts: pd.DataFrame = None, **kwargs) -> tuple:
     """Screen the representatives, from a PDB tree or from a verdict table already computed."""
     if (model_dir is None) == (verdicts is None):
@@ -228,7 +265,7 @@ def apply_topology(representatives: pd.DataFrame, *, model_dir: Path = None,
                          "read a screen that has already been run")
     wanted = set(representatives["model_file"])
     if verdicts is None:
-        verdicts = judge_topology(collect_models(model_dir, wanted), **kwargs)
+        verdicts = judge_topology(collect_models(model_dir, wanted), chan=chan, **kwargs)
     else:
         verdicts = verdicts.copy()
         key = "model_file" if "model_file" in verdicts.columns else "pdb_file"
@@ -257,30 +294,40 @@ class ChainResult:
     counts: dict = field(default_factory=dict)
 
 
-def run_chain(distances: pd.DataFrame, convergence: pd.DataFrame, *, model_dir=None,
-              topology_verdicts=None, g377_threshold_A: float = G377_RING_MAX_A,
-              interface_threshold_A: float = INTERFACE_MAX_A, label: str = "Kv2.1 cohort",
+def run_chain(distances: pd.DataFrame, convergence: pd.DataFrame, *, channel: str = "Kv2.1",
+              model_dir=None, topology_verdicts=None, ring_threshold_A: float = None,
+              interface_threshold_A: float = INTERFACE_MAX_A, label: str = None,
               **topology_kwargs) -> ChainResult:
-    """Pass one cohort through convergence, G377, the interface QC and the topology screen, in that
-    order and no other (see the module docstring for why the order is not a free choice)."""
+    """Pass one cohort through convergence, the filter ring, the interface QC and the topology
+    screen, in that order and no other (see the module docstring for why the order is not free).
+
+    Only Kv2.1 has a published pore-VSD interface cutoff, so for Nav1.5 and Cav1.2 the chain is the
+    other three steps and the counts say the interface step was not run. That is a gap in what we
+    have measured, not a decision that those channels need no interface check."""
+    chan = get_channel(channel)
+    label = label or f"{chan.name} cohort"
     distances = distances.copy()
     distances.attrs["dataset_label"] = label
-    counts = {}
+    counts = {"channel": chan.name}
 
     kept, counts["convergence"] = apply_convergence(distances, convergence)
-    kept, counts["g377_ring"] = apply_g377_ring(kept, threshold_A=g377_threshold_A)
+    kept, counts["filter_ring"] = apply_filter_ring(kept, chan, threshold_A=ring_threshold_A)
 
-    before = kept["trajectory"].nunique()
-    kept = apply_kv21_interface_qc(kept, threshold_A=interface_threshold_A, trajectory_level=True)
-    counts["interface_qc"] = {
-        "trajectories_rejected": before - kept["trajectory"].nunique(),
-        "models_rejected": int(kept.attrs.get("kv21_interface_qc_rejected_rows", 0)),
-        "threshold_A": float(interface_threshold_A)}
+    if chan.interface_qc:
+        before = kept["trajectory"].nunique()
+        kept = apply_kv21_interface_qc(kept, threshold_A=interface_threshold_A, trajectory_level=True)
+        counts["interface_qc"] = {
+            "trajectories_rejected": before - kept["trajectory"].nunique(),
+            "models_rejected": int(kept.attrs.get("kv21_interface_qc_rejected_rows", 0)),
+            "threshold_A": float(interface_threshold_A)}
+    else:
+        counts["interface_qc"] = {"trajectories_rejected": 0, "models_rejected": 0,
+                                  "not_run": f"no published interface cutoff for {chan.name}"}
 
     representatives = kept.loc[kept["is_representative"]].copy()
     representatives.attrs.update(kept.attrs)
     representatives, verdicts, counts["topology"] = apply_topology(
-        representatives, model_dir=model_dir, verdicts=topology_verdicts, **topology_kwargs)
+        representatives, chan=chan, model_dir=model_dir, verdicts=topology_verdicts, **topology_kwargs)
 
     surviving = set(representatives["trajectory"])
     retained = kept.loc[kept["trajectory"].isin(surviving)].copy()
@@ -288,7 +335,7 @@ def run_chain(distances: pd.DataFrame, convergence: pd.DataFrame, *, model_dir=N
     counts["surviving_trajectories"] = len(surviving)
     print(f"{label}: {counts['convergence']['trajectories_in']} trajectories in, "
           f"{counts['convergence']['trajectories_out']} converged, "
-          f"-{counts['g377_ring']['trajectories_rejected']} G377, "
+          f"-{counts['filter_ring']['trajectories_rejected']} filter ring, "
           f"-{counts['interface_qc']['trajectories_rejected']} interface, "
           f"-{counts['topology']['representatives_in'] - counts['topology']['representatives_out']} topology; "
           f"{len(surviving)} surviving")
@@ -303,7 +350,8 @@ def main(argv=None) -> int:
                         help="the cohort's all_ok_models CSV from the published convergence script")
     parser.add_argument("--model-dir", type=Path, help="the cohort's PDB tree, to screen the representatives")
     parser.add_argument("--topology", type=Path, help="instead of --model-dir: topology verdicts already computed")
-    parser.add_argument("--label", default="Kv2.1 cohort")
+    parser.add_argument("--channel", default="Kv2.1", help="Kv2.1, Nav1.5 or Cav1.2")
+    parser.add_argument("--label", default=None)
     parser.add_argument("--output", required=True, type=Path, help="where to write the filtered table")
     parser.add_argument("--topology-output", type=Path, help="where to write the topology verdicts")
     args = parser.parse_args(argv)
@@ -311,6 +359,7 @@ def main(argv=None) -> int:
     result = run_chain(
         pd.read_csv(args.distances, low_memory=False),
         pd.read_csv(args.convergence, low_memory=False),
+        channel=args.channel,
         model_dir=args.model_dir,
         topology_verdicts=pd.read_csv(args.topology) if args.topology else None,
         label=args.label)

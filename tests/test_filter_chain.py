@@ -67,7 +67,7 @@ def test_g377_ring_rejects_the_whole_trajectory():
     frame = _cohort()
     frame.loc[0, "CA_CA_A_GLY377_CA-B_GLY377_CA"] = 25.0          # seed 1, recycle 0 only
     kept, _ = fc.apply_convergence(frame, _convergence())
-    kept, counts = fc.apply_g377_ring(kept)
+    kept, counts = fc.apply_filter_ring(kept, fc.get_channel("Kv2.1"))
     assert counts["trajectories_rejected"] == 1
     assert set(kept.trajectory) == {"model_1_seed_2.pdb"}
 
@@ -113,3 +113,36 @@ def test_the_experimental_structures_pass_the_topology_screen():
     verdicts = fc.judge_topology(paths, segments=fc.SEGMENTS_EXPERIMENTAL)
     assert list(verdicts.error) == ["", ""]
     assert verdicts.topology_ok.all()
+
+
+# =========================================================================== the other two channels
+
+def test_pseudo_tetramer_ring_columns_resolve_either_way_round():
+    """Nav1.5 and Cav1.2 name a ring column by a pair of residues, in whichever order."""
+    chan = fc.get_channel("Cav1.2")
+    frame = pd.DataFrame({f"CA_{a}_CA-{b}_CA": [10.0] for a, b in
+                          itertools.combinations(chan.ring_residues, 2)})
+    assert len(fc.filter_ring_columns(frame, chan)) == 6
+    flipped = frame.rename(columns={"CA_GLU363_CA-GLU706_CA": "CA_GLU706_CA-GLU363_CA"})
+    assert len(fc.filter_ring_columns(flipped, chan)) == 6
+
+
+def test_every_channel_has_four_subunits_worth_of_segments():
+    for name in ("Kv2.1", "Nav1.5", "Cav1.2"):
+        chan = fc.get_channel(name)
+        assert len(chan.segments) * len(chan.chains) == 4, name
+        for table in chan.segments:
+            assert set(table) >= {"S1", "S4", "S5", "S6_upper", "S6_lower"}
+
+
+def test_the_screen_runs_on_a_cav12_pseudo_tetramer():
+    """One chain with four repeat tables is the shape Nav1.5 and Cav1.2 models have. 8WE6's lower
+    S6 ring reads about 86/90/92/93 degrees with these segments, so it passes the box check."""
+    path = REPO_ROOT / "cav12" / "experimental" / "8WE6.pdb"
+    if not path.exists():
+        pytest.skip("8WE6 is not available here")
+    verdicts = fc.judge_topology({path.name: path}, chan=fc.get_channel("Cav1.2"))
+    row = verdicts.iloc[0]
+    assert row.error == ""
+    assert row.wiring == 4 and row.s6_on_own_s5 == 4
+    assert bool(row.topology_ok)
