@@ -185,3 +185,35 @@ def test_s6_linker_qc_rejects_the_whole_trajectory():
     kept, counts = fc.apply_s6_linker_qc(frame, measures, threshold_A=12.0)
     assert set(kept["trajectory"]) == {"b.pdb"}
     assert counts["trajectories_rejected"] == 1 and counts["models_rejected"] == 2
+
+
+def test_the_generalized_interface_step_runs_in_the_chain():
+    """`s6_linker` rejects on the measure table the way `published` rejects on the distance table."""
+    verdicts = pd.DataFrame({"model_file": [f"model_1_seed_{s}.r0.pdb" for s in (1, 2)],
+                             "topology_ok": ["True", "True"], "error": ["", ""]})
+    measures = pd.DataFrame({
+        "pdb_file": [f"model_1_seed_{s}.r{r}.pdb" for s in (1, 2) for r in (0, 1)],
+        "s6_linker_max_A": [6.0, 18.0, 6.1, 6.2]})          # seed 1 lets go at recycle 1
+    result = fc.run_chain(_cohort(), _convergence(), topology_verdicts=verdicts,
+                          interface_measures=measures, interface_mode="s6_linker",
+                          label="synthetic")
+    assert result.counts["interface_mode"] == "s6_linker"
+    assert result.counts["s6_linker_qc"]["trajectories_rejected"] == 1
+    assert result.counts["interface_qc"]["trajectories_rejected"] == 0
+    assert list(result.representatives.trajectory) == ["model_1_seed_2.pdb"]
+
+
+def test_both_interface_forms_can_run_together():
+    """`both` is how the sweep asks whether the two checks catch the same trajectories."""
+    frame = _cohort()
+    frame.loc[1, "CA_CA_A_LYS429_CA-A_ASN181_CA"] = 31.0          # seed 1 fails the published check
+    verdicts = pd.DataFrame({"model_file": [f"model_1_seed_{s}.r0.pdb" for s in (1, 2)],
+                             "topology_ok": ["True", "True"], "error": ["", ""]})
+    measures = pd.DataFrame({
+        "pdb_file": [f"model_1_seed_{s}.r{r}.pdb" for s in (1, 2) for r in (0, 1)],
+        "s6_linker_max_A": [6.0, 6.0, 6.1, 6.2]})                 # and nothing fails the new one
+    result = fc.run_chain(frame, _convergence(), topology_verdicts=verdicts,
+                          interface_measures=measures, interface_mode="both", label="synthetic")
+    assert result.counts["s6_linker_qc"]["trajectories_rejected"] == 0
+    assert result.counts["interface_qc"]["trajectories_rejected"] == 1
+    assert result.counts["surviving_trajectories"] == 1

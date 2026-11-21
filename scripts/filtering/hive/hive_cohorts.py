@@ -4,15 +4,24 @@
 The chain is filter_stats/filter_chain.py; this only says where each cohort's three inputs live on
 Quobyte and where its results go. Two steps, because only one of them needs the models:
 
+  measure one array task per cohort: read every model the distance table names and write its
+          pore-VSD interface distance - the lower S6 against its own S4-S5 linker, per subunit.
+          This one walks all eleven recycles, because the check rejects a trajectory on any of
+          them, and it is written out once so that trying a different cutoff costs nothing.
   judge   one array task per cohort: read that cohort's convergence representatives out of its PDB
           tree and write their topology verdicts. One model per trajectory, not all eleven
           recycles, which is why the topology screen is the last step of the chain and not the
           first.
+  sweep   every cohort in one job: the same inputs run through several filtering setups, so the
+          cost of a setup can be read off one table instead of argued about. Nothing is recomputed
+          between setups; they are all questions asked of the four tables the steps above wrote.
   chain   every cohort in one job: convergence, filter ring, interface QC (Kv2.1 only) and then
           those verdicts, writing <cohort>_chain_qc.csv and a .json of the per-step counts.
 
+  python hive_cohorts.py measure --index $SLURM_ARRAY_TASK_ID
   python hive_cohorts.py judge --index $SLURM_ARRAY_TASK_ID
   python hive_cohorts.py chain --all
+  python hive_cohorts.py sweep --all
 """
 from __future__ import annotations
 
@@ -37,6 +46,7 @@ def _cohort(key, channel, distances, convergence, models) -> dict:
     return {"key": key, "channel": channel, "distances": ROOT / distances,
             "convergence": ROOT / convergence, "models": ROOT / models,
             "topology": OUT / f"{key}_topology_verdicts.csv",
+            "interface": OUT / f"{key}_interface.csv",
             "output": OUT / f"{key}_chain_qc.csv", "summary": OUT / f"{key}_chain_qc.json"}
 
 
@@ -94,6 +104,20 @@ def representatives(cohort: dict) -> set:
     return set(names[chosen])
 
 
+def measure(cohort: dict) -> None:
+    OUT.mkdir(parents=True, exist_ok=True)
+    distances = pd.read_csv(cohort["distances"], usecols=["pdb_file"], low_memory=False)
+    wanted = set(fc.basenames(distances["pdb_file"]))
+    print(f"{cohort['key']}: measuring {len(wanted)} models under {cohort['models']}", flush=True)
+    frame = fc.measure_interface(fc.collect_models(cohort["models"], wanted),
+                                 fc.get_channel(cohort["channel"]))
+    frame.to_csv(cohort["interface"], index=False)
+    widest = frame["s6_linker_max_A"]
+    print(f"{cohort['key']}: S6-to-linker median={widest.median():.2f} A, "
+          f"95th={widest.quantile(0.95):.2f} A, max={widest.max():.2f} A, "
+          f"{int(frame.error.astype(str).ne('').sum())} unreadable; wrote {cohort['interface']}", flush=True)
+
+
 def judge(cohort: dict) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     wanted = representatives(cohort)
@@ -106,12 +130,14 @@ def judge(cohort: dict) -> None:
           f"{failed} could not be judged; wrote {cohort['topology']}", flush=True)
 
 
-def chain(cohort: dict) -> dict:
+def chain(cohort: dict, **kwargs) -> dict:
+    measures = pd.read_csv(cohort["interface"]) if cohort["interface"].exists() else None
     result = fc.run_chain(pd.read_csv(cohort["distances"], low_memory=False),
                           pd.read_csv(cohort["convergence"], low_memory=False),
                           channel=cohort["channel"],
                           topology_verdicts=pd.read_csv(cohort["topology"]),
-                          label=cohort["key"])
+                          interface_measures=measures,
+                          label=cohort["key"], **kwargs)
     result.representatives.to_csv(cohort["output"], index=False)
     counts = {"cohort": cohort["key"], **result.counts}
     cohort["summary"].write_text(json.dumps(counts, indent=2, default=str) + "\n")
@@ -119,9 +145,72 @@ def chain(cohort: dict) -> dict:
     return counts
 
 
+# Each setup is (name, interface_mode, s6-linker cutoff in A, whether the topology screen runs).
+# "published" is the 27 A Kv2.1 check and simply does not run for the other two channels, which is
+# the asymmetry the sweep is meant to expose.
+SETUPS = (
+    ("convergence_only", "none", None, False),
+    ("ring", "none", None, False),
+    ("ring_topology", "none", None, True),
+    ("ring_published", "published", None, False),
+    ("ring_published_topology", "published", None, True),
+    ("ring_s6linker10", "s6_linker", 10.0, False),
+    ("ring_s6linker12", "s6_linker", 12.0, False),
+    ("ring_s6linker16", "s6_linker", 16.0, False),
+    ("ring_s6linker20", "s6_linker", 20.0, False),
+    ("ring_s6linker12_topology", "s6_linker", 12.0, True),
+    ("ring_published_s6linker12_topology", "both", 12.0, True),
+)
+
+
+def sweep(chosen: list) -> pd.DataFrame:
+    """Every cohort through every setup, one row each, counting what each step costs.
+
+    The convergence-only row is there as the denominator: a step that removes nothing is not a
+    clean ensemble, it is a step with no discrimination on this data, and the only way to tell the
+    two apart is to see the same step bite somewhere else."""
+    rows = []
+    for cohort in chosen:
+        distances = pd.read_csv(cohort["distances"], low_memory=False)
+        convergence = pd.read_csv(cohort["convergence"], low_memory=False)
+        verdicts = pd.read_csv(cohort["topology"]) if cohort["topology"].exists() else None
+        measures = pd.read_csv(cohort["interface"]) if cohort["interface"].exists() else None
+        for name, mode, cutoff, topology in SETUPS:
+            if mode in ("s6_linker", "both") and measures is None:
+                continue
+            if topology and verdicts is None:
+                continue
+            ring = 1e9 if name == "convergence_only" else None
+            result = fc.run_chain(
+                distances, convergence, channel=cohort["channel"],
+                topology_verdicts=verdicts if topology else _everything_passes(verdicts),
+                interface_measures=measures, interface_mode=mode, s6_linker_threshold_A=cutoff,
+                ring_threshold_A=ring, label=f"{cohort['key']}/{name}")
+            c = result.counts
+            rows.append({"cohort": cohort["key"], "channel": cohort["channel"], "setup": name,
+                         "trajectories_in": c["convergence"]["trajectories_in"],
+                         "converged": c["convergence"]["trajectories_out"],
+                         "lost_ring": c["filter_ring"]["trajectories_rejected"],
+                         "lost_published": c["interface_qc"]["trajectories_rejected"],
+                         "lost_s6linker": c["s6_linker_qc"]["trajectories_rejected"],
+                         "lost_topology": (c["topology"]["representatives_in"]
+                                           - c["topology"]["representatives_out"]),
+                         "surviving": c["surviving_trajectories"]})
+    return pd.DataFrame(rows)
+
+
+def _everything_passes(verdicts):
+    """The verdict table with every model passing, which is how a setup leaves the screen out."""
+    if verdicts is None:
+        return None
+    passing = verdicts.copy()
+    passing["topology_ok"] = True
+    return passing
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("mode", choices=("judge", "chain", "list"))
+    parser.add_argument("mode", choices=("measure", "judge", "chain", "sweep", "list"))
     parser.add_argument("--index", type=int, help="array index into the cohort list")
     parser.add_argument("--cohort", action="append", help="a cohort key; repeatable")
     parser.add_argument("--all", action="store_true")
@@ -131,6 +220,7 @@ def main(argv=None) -> int:
         for i, c in enumerate(COHORTS):
             print(f"  {i:2d}  {c['key']:16s} {c['channel']:7s} "
                   f"{'models ok' if c['models'].is_dir() else 'MODELS MISSING':14s} "
+                  f"{'interface ok' if c['interface'].exists() else 'no interface':13s} "
                   f"{'distances ok' if c['distances'].exists() else 'DISTANCES MISSING'}")
         return 0
 
@@ -143,9 +233,22 @@ def main(argv=None) -> int:
     else:
         parser.error("give --index, --cohort or --all")
 
+    if args.mode == "measure":
+        for cohort in chosen:
+            measure(cohort)
+        return 0
+
     if args.mode == "judge":
         for cohort in chosen:
             judge(cohort)
+        return 0
+
+    if args.mode == "sweep":
+        table = sweep(chosen)
+        path = OUT / "filtering_setup_sweep.csv"
+        table.to_csv(path, index=False)
+        print(table.to_string(index=False), flush=True)
+        print(f"wrote {path}", flush=True)
         return 0
 
     missing = [c["key"] for c in chosen if not c["topology"].exists()]
