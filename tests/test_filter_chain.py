@@ -153,26 +153,37 @@ def test_the_screen_runs_on_a_cav12_pseudo_tetramer():
 
 def test_s6_linker_contact_holds_in_every_experimental_structure():
     """The gate's own S4-S5 linker is a close contact in all three channels, well under the cutoff."""
-    cases = {"Kv2.1": ("kv21", ("8SD3", "8SDA", "9O10", "9O11")),
+    cases = {"Kv2.1": ("kv21", ("8SD3", "8SDA", "9O10", "9O11", "9O12", "9O13")),
              "Cav1.2": ("cav12", ("8WE6", "8HLP")),
-             "Nav1.5": ("nav15", ("7DTC", "8VYJ"))}
+             "Nav1.5": ("nav15", ("7DTC", "6UZ3", "7FBS", "8T6L", "8VYJ", "8VYK"))}
+    seen = 0
     for name, (folder, entries) in cases.items():
         chan = channels.channel(name)
         for entry in entries:
             path = REPO_ROOT / folder / "experimental" / f"{entry}.pdb"
             if not path.exists():
                 continue
-            values = [v for v in fc.s6_linker_distances(path, chan) if v == v]
-            if not values:                                  # a construct numbered unlike the models
-                continue
+            values = fc.s6_linker_distances(path, chan, segments=chan.experimental_segments())
+            # Not `if v == v`: a NaN here means the structure was not measured at all, which is how
+            # a numbering mistake passes itself off as a clean result.
+            assert all(v == v for v in values), f"{name} {entry} unmeasured: {values}"
+            seen += 1
             assert max(values) < chan.s6_linker_max_A, f"{name} {entry}: {values}"
+    # A check that rejects nothing because it measured nothing would otherwise pass quietly.
+    assert seen == 14, f"only {seen} experimental structures were actually measured"
 
 
-def test_s6_linker_prefers_the_subunits_own_linker():
-    """8SD3's own-linker contact is nearer than the same measure taken against any other subunit."""
-    chan = channels.channel("Kv2.1")
-    own = fc.s6_linker_distances(REPO_ROOT / "kv21" / "experimental" / "8SD3.pdb", chan)
-    assert max(own) < 7.0
+def test_experimental_numbering_is_not_one_offset_for_nav15():
+    """The construct's offset against 7DTC is piecewise, and differs either side of repeat II's filter.
+
+    Measuring a solved structure in the models' numbering is the quiet way to get this wrong: for
+    Kv2.1 it gives the right answer anyway, so only Nav1.5 catches it."""
+    chan = channels.channel("Nav1.5")
+    path = REPO_ROOT / "nav15" / "experimental" / "7DTC.pdb"
+    right = fc.s6_linker_distances(path, chan, segments=chan.experimental_segments())
+    wrong = fc.s6_linker_distances(path, chan)
+    assert all(v == v for v in right)
+    assert any(v != v for v in wrong), "the model numbering should not even resolve on 7DTC"
 
 
 def test_s6_linker_qc_rejects_the_whole_trajectory():

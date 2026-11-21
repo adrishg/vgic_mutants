@@ -48,6 +48,10 @@ from dataclasses import dataclass
 S6_LOWER_LENGTH = 12              # residues below the gate: a fixed window, not the rest of the helix
 
 
+VSD_SEGMENTS = ("S1", "S2", "S3", "S4", "linker")
+PORE_SEGMENTS = ("S5", "pore_helix", "filter", "S6_upper", "S6_lower")
+
+
 @dataclass(frozen=True)
 class Channel:
     """One channel's chain layout, filter ring and repeat segments."""
@@ -59,6 +63,26 @@ class Channel:
     segments: tuple = ()          # one table per repeat; a homotetramer gives one table for all four
     interface_qc: bool = False    # the published Kv2.1 pore-VSD cutoff applies to this channel
     s6_linker_max_A: float = 12.0  # the gate-to-S4-S5-linker contact may open this far and no further
+    experimental_offsets: tuple = ()  # per repeat, (voltage sensor, pore): add to a model number
+
+    def experimental_segments(self) -> tuple:
+        """The segment tables written in the experimental structures' numbering instead of the models'.
+
+        Calibrating a cutoff means measuring the same thing on a solved structure that the check
+        measures on a model, and for Nav1.5 that is not one subtraction: the construct's offset
+        against 7DTC is piecewise, and within repeat II it differs either side of the filter. Taking
+        the offsets from here is what keeps the calibration and the check the same measurement."""
+        if not self.experimental_offsets:
+            return self.segments
+        tables = self.segments if len(self.segments) > 1 else self.segments * len(self.experimental_offsets)
+        out = []
+        for table, (vsd, pore) in zip(tables, self.experimental_offsets):
+            shifted = {}
+            for key, (first, last) in table.items():
+                shift = vsd if key in VSD_SEGMENTS else pore
+                shifted[key] = (first + shift, last + shift)
+            out.append(shifted)
+        return tuple(out)
 
     def subunits(self) -> tuple:
         """(chain, segment table) once per subunit, whichever way the channel is built.
@@ -114,15 +138,16 @@ NAV15_SEGMENTS = (
 CHANNELS = {
     "Kv2.1": Channel(name="Kv2.1", chains=("A", "B", "C", "D"), ring_position=377,
                      ring_max_A=20.0, segments=KV21_SEGMENTS, interface_qc=True,
-                     s6_linker_max_A=12.0),
+                     s6_linker_max_A=12.0, experimental_offsets=((-2, -2),) * 4),
     "Cav1.2": Channel(name="Cav1.2", chains=("A",),
                       ring_residues=("GLU363", "GLU706", "GLU1135", "GLU1464"),
                       ring_max_A=20.0, segments=CAV12_SEGMENTS, interface_qc=False,
-                      s6_linker_max_A=12.0),
+                      s6_linker_max_A=12.0, experimental_offsets=((0, 0),) * 4),
     "Nav1.5": Channel(name="Nav1.5", chains=("A",),
                       ring_residues=("ASP373", "GLU704", "LYS1103", "ALA1395"),
                       ring_max_A=20.0, segments=NAV15_SEGMENTS, interface_qc=False,
-                      s6_linker_max_A=12.0),
+                      s6_linker_max_A=12.0,
+                      experimental_offsets=((1, 1), (196, 194), (316, 316), (316, 316))),
 }
 
 ALIASES = {"kv21": "Kv2.1", "kv2.1": "Kv2.1", "cav12": "Cav1.2", "cav1.2": "Cav1.2",

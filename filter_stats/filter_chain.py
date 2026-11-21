@@ -188,7 +188,7 @@ def apply_filter_ring(frame: pd.DataFrame, chan: Channel, *, threshold_A: float 
 
 # =========================================================================== step 3b: S6 against its own linker
 
-def s6_linker_distances(path: Path, chan: Channel) -> list:
+def s6_linker_distances(path: Path, chan: Channel, *, segments=None) -> list:
     """How far each subunit's lower S6 sits from its own S4-S5 linker, closest Ca-Ca pair.
 
     This is the pore-VSD interface check written so that all three channels can take it. The
@@ -202,7 +202,9 @@ def s6_linker_distances(path: Path, chan: Channel) -> list:
     chain_index = {c: i for i, c in enumerate(chan.chains)}
     number_index = {int(n): i for i, n in enumerate(numbers)}
     out = []
-    for chain, segments in chan.subunits():
+    subunits = chan.subunits() if segments is None else tuple(
+        zip([c for c, _ in chan.subunits()], segments))
+    for chain, segments in subunits:
         rows = coords[chain_index[chain]]
         a = np.array([rows[number_index[n]] for n in range(*_inclusive(segments["S6_lower"]))
                       if n in number_index])
