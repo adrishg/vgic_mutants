@@ -25,6 +25,17 @@ chain transfers:
    window is a per-channel number, not a constant, and S6_LOWER_LENGTH matters: the angles are very
    sensitive to a lower-S6 range that runs past the modeled helix.
 
+A third finding, measured on 2026-11-21 across fourteen experimental structures, replaces the
+Kv2.1 interface check for the other two channels. The published 27 A cutoff is the widest of the
+K429/E425/K422-to-N181/V184 contacts, which is the end of S6 against the residues just before S1 of
+the same subunit. That pairing is a contact only in Kv2.1 (8.6 A in 8SD3); in Cav1.2 and Nav1.5 the
+same two elements sit 25 to 50 A apart, so a cutoff on them would be a threshold on a non-contact.
+What does hold everywhere is the lower S6 against its own S4-S5 linker, the joint the gate actually
+hangs from: 5.1-6.9 A over six Kv2.1 structures, 4.8-7.6 A over two Cav1.2, 5.6-9.2 A over six
+Nav1.5, and in every one of them the subunit's own linker is nearer than any other subunit's. That
+is the measure `s6_linker_max_A` thresholds, and 12 A sits well clear of the 9.2 A widest contact
+any experimental structure shows.
+
 A note on Nav1.5 numbering. The cohorts use a loop-truncated construct, and its offset against the
 experimental structures is piecewise - DI -1, DII +196 through the voltage sensor but +194 from the
 filter on, DIII and DIV +316. So a Nav1.5 segment table has to be built in the models' own numbering,
@@ -46,7 +57,17 @@ class Channel:
     ring_residues: tuple = ()     # pseudo-tetramer: the four filter residues, in model numbering
     ring_max_A: float = 20.0
     segments: tuple = ()          # one table per repeat; a homotetramer gives one table for all four
-    interface_qc: bool = False    # a published pore-VSD interface cutoff exists for this channel
+    interface_qc: bool = False    # the published Kv2.1 pore-VSD cutoff applies to this channel
+    s6_linker_max_A: float = 12.0  # the gate-to-S4-S5-linker contact may open this far and no further
+
+    def subunits(self) -> tuple:
+        """(chain, segment table) once per subunit, whichever way the channel is built.
+
+        A homotetramer has four chains sharing one table; a pseudo-tetramer has one chain with four.
+        Everything measured per subunit goes through here so it does not have to care which."""
+        if len(self.segments) == 1:
+            return tuple((c, self.segments[0]) for c in self.chains)
+        return tuple((self.chains[0], s) for s in self.segments)
 
 
 def _repeat(s1, s2, s3, s4, linker, s5, pore_helix, filter_, s6_start, gate) -> dict:
@@ -92,13 +113,16 @@ NAV15_SEGMENTS = (
 
 CHANNELS = {
     "Kv2.1": Channel(name="Kv2.1", chains=("A", "B", "C", "D"), ring_position=377,
-                     ring_max_A=20.0, segments=KV21_SEGMENTS, interface_qc=True),
+                     ring_max_A=20.0, segments=KV21_SEGMENTS, interface_qc=True,
+                     s6_linker_max_A=12.0),
     "Cav1.2": Channel(name="Cav1.2", chains=("A",),
                       ring_residues=("GLU363", "GLU706", "GLU1135", "GLU1464"),
-                      ring_max_A=20.0, segments=CAV12_SEGMENTS, interface_qc=False),
+                      ring_max_A=20.0, segments=CAV12_SEGMENTS, interface_qc=False,
+                      s6_linker_max_A=12.0),
     "Nav1.5": Channel(name="Nav1.5", chains=("A",),
                       ring_residues=("ASP373", "GLU704", "LYS1103", "ALA1395"),
-                      ring_max_A=20.0, segments=NAV15_SEGMENTS, interface_qc=False),
+                      ring_max_A=20.0, segments=NAV15_SEGMENTS, interface_qc=False,
+                      s6_linker_max_A=12.0),
 }
 
 ALIASES = {"kv21": "Kv2.1", "kv2.1": "Kv2.1", "cav12": "Cav1.2", "cav1.2": "Cav1.2",

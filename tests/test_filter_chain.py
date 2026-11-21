@@ -11,6 +11,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "filter_stats"))
 
+import channels  # noqa: E402
 import filter_chain as fc  # noqa: E402
 
 
@@ -146,3 +147,41 @@ def test_the_screen_runs_on_a_cav12_pseudo_tetramer():
     assert row.error == ""
     assert row.wiring == 4 and row.s6_on_own_s5 == 4
     assert bool(row.topology_ok)
+
+
+# ---------------------------------------------------------------- the generalized interface check
+
+def test_s6_linker_contact_holds_in_every_experimental_structure():
+    """The gate's own S4-S5 linker is a close contact in all three channels, well under the cutoff."""
+    cases = {"Kv2.1": ("kv21", ("8SD3", "8SDA", "9O10", "9O11")),
+             "Cav1.2": ("cav12", ("8WE6", "8HLP")),
+             "Nav1.5": ("nav15", ("7DTC", "8VYJ"))}
+    for name, (folder, entries) in cases.items():
+        chan = channels.channel(name)
+        for entry in entries:
+            path = REPO_ROOT / folder / "experimental" / f"{entry}.pdb"
+            if not path.exists():
+                continue
+            values = [v for v in fc.s6_linker_distances(path, chan) if v == v]
+            if not values:                                  # a construct numbered unlike the models
+                continue
+            assert max(values) < chan.s6_linker_max_A, f"{name} {entry}: {values}"
+
+
+def test_s6_linker_prefers_the_subunits_own_linker():
+    """8SD3's own-linker contact is nearer than the same measure taken against any other subunit."""
+    chan = channels.channel("Kv2.1")
+    own = fc.s6_linker_distances(REPO_ROOT / "kv21" / "experimental" / "8SD3.pdb", chan)
+    assert max(own) < 7.0
+
+
+def test_s6_linker_qc_rejects_the_whole_trajectory():
+    """One recycle over the cutoff takes its trajectory with it, as the published check does."""
+    frame = pd.DataFrame({
+        "model_file": ["a.r0.pdb", "a.r1.pdb", "b.r0.pdb", "b.r1.pdb"],
+        "trajectory": ["a.pdb", "a.pdb", "b.pdb", "b.pdb"]})
+    measures = pd.DataFrame({"pdb_file": ["a.r0.pdb", "a.r1.pdb", "b.r0.pdb", "b.r1.pdb"],
+                             "s6_linker_max_A": [6.0, 19.0, 6.1, 6.2]})
+    kept, counts = fc.apply_s6_linker_qc(frame, measures, threshold_A=12.0)
+    assert set(kept["trajectory"]) == {"b.pdb"}
+    assert counts["trajectories_rejected"] == 1 and counts["models_rejected"] == 2

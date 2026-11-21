@@ -60,6 +60,7 @@ from channels import Channel, channel as get_channel                   # noqa: E
 
 G377_RING_MAX_A = 20.0            # the published selectivity-filter ring cutoff, trajectory level
 INTERFACE_MAX_A = 27.0            # the published pore-VSD interface cutoff, trajectory level
+S6_LINKER_MAX_A = 12.0            # the generalized pore-VSD cutoff, trajectory level
 TOPOLOGY_CHECKS = ("wiring", "box_corners", "s6_on_own_s5")            # the checks needing no reference
 RECYCLE_SUFFIX = re.compile(r"\.r\d+\.pdb$")
 MODEL_META = re.compile(r"model_(\d+)_seed_(\d+)\.r(\d+)\.pdb$")
@@ -173,6 +174,83 @@ def apply_filter_ring(frame: pd.DataFrame, chan: Channel, *, threshold_A: float 
     kept.attrs.update(frame.attrs)
     return kept, {"trajectories_rejected": len(failed),
                   "models_rejected": int(len(frame) - len(kept)),
+                  "threshold_A": float(threshold_A),
+                  "widest_retained_A": float(widest.loc[kept.index].max()) if len(kept) else float("nan")}
+
+
+# =========================================================================== step 3b: S6 against its own linker
+
+def s6_linker_distances(path: Path, chan: Channel) -> list:
+    """How far each subunit's lower S6 sits from its own S4-S5 linker, closest Ca-Ca pair.
+
+    This is the pore-VSD interface check written so that all three channels can take it. The
+    published Kv2.1 version thresholds the end of S6 against the residues before S1, and that
+    pairing is a contact in a domain-swapped homotetramer and nowhere else - in Cav1.2 and Nav1.5
+    those elements are 25 to 50 A apart (channels.py, item 3). The gate's own S4-S5 linker is the
+    joint it hangs from in every voltage-gated channel, and across fourteen experimental structures
+    the closest approach runs 4.8 to 9.2 A with the subunit's own linker always nearest. A model
+    whose S6 has let go of that linker has come apart at the one place the pore is held."""
+    coords, numbers = _load_ca(path, chains=chan.chains)
+    chain_index = {c: i for i, c in enumerate(chan.chains)}
+    number_index = {int(n): i for i, n in enumerate(numbers)}
+    out = []
+    for chain, segments in chan.subunits():
+        rows = coords[chain_index[chain]]
+        a = np.array([rows[number_index[n]] for n in range(*_inclusive(segments["S6_lower"]))
+                      if n in number_index])
+        b = np.array([rows[number_index[n]] for n in range(*_inclusive(segments["linker"]))
+                      if n in number_index])
+        a = a[np.isfinite(a).all(axis=1)] if len(a) else a
+        b = b[np.isfinite(b).all(axis=1)] if len(b) else b
+        if not len(a) or not len(b):
+            out.append(float("nan"))
+            continue
+        out.append(float(np.linalg.norm(a[:, None, :] - b[None, :, :], axis=-1).min()))
+    return out
+
+
+def _inclusive(span) -> tuple:
+    """A (first, last) residue span as the half-open range that walks it."""
+    return int(span[0]), int(span[1]) + 1
+
+
+def measure_interface(paths: dict, chan: Channel) -> pd.DataFrame:
+    """One row per model: each subunit's S6-to-linker distance and the widest of them.
+
+    Walking a whole cohort's PDB tree is the expensive part, so the measure is written out once and
+    every threshold is then a question asked of the table rather than of the models again."""
+    rows = []
+    for name, path in sorted(paths.items()):
+        try:
+            per = s6_linker_distances(Path(path), chan)
+            error = ""
+        except Exception as exc:                                       # noqa: BLE001
+            per, error = [float("nan")] * len(chan.subunits()), f"{type(exc).__name__}: {exc}"
+        row = {"pdb_file": name, "error": error}
+        for i, value in enumerate(per, start=1):
+            row[f"s6_linker_{i}_A"] = value
+        finite = [v for v in per if np.isfinite(v)]
+        row["s6_linker_max_A"] = max(finite) if finite else float("nan")
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def apply_s6_linker_qc(frame: pd.DataFrame, measures: pd.DataFrame, *, threshold_A: float = S6_LINKER_MAX_A,
+                       trajectory_level: bool = True) -> tuple:
+    """Reject trajectories whose S6 has let go of its linker in any retained recycle."""
+    widest = frame["model_file"].map(
+        measures.set_index("pdb_file")["s6_linker_max_A"].to_dict())
+    unmeasured = int(widest.isna().sum())
+    over = widest.gt(threshold_A)
+    if trajectory_level:
+        rejected = frame["trajectory"].isin(set(frame.loc[over, "trajectory"]))
+    else:
+        rejected = over
+    kept = frame.loc[~rejected].copy()
+    kept.attrs.update(frame.attrs)
+    return kept, {"trajectories_rejected": frame["trajectory"].nunique() - kept["trajectory"].nunique(),
+                  "models_rejected": int(rejected.sum()),
+                  "models_unmeasured": unmeasured,
                   "threshold_A": float(threshold_A),
                   "widest_retained_A": float(widest.loc[kept.index].max()) if len(kept) else float("nan")}
 
@@ -304,14 +382,18 @@ class ChainResult:
 
 def run_chain(distances: pd.DataFrame, convergence: pd.DataFrame, *, channel: str = "Kv2.1",
               model_dir=None, topology_verdicts=None, ring_threshold_A: float = None,
-              interface_threshold_A: float = INTERFACE_MAX_A, label: str = None,
-              **topology_kwargs) -> ChainResult:
+              interface_threshold_A: float = INTERFACE_MAX_A, interface_measures=None,
+              interface_mode: str = "auto", s6_linker_threshold_A: float = None,
+              label: str = None, **topology_kwargs) -> ChainResult:
     """Pass one cohort through convergence, the filter ring, the interface QC and the topology
     screen, in that order and no other (see the module docstring for why the order is not free).
 
-    Only Kv2.1 has a published pore-VSD interface cutoff, so for Nav1.5 and Cav1.2 the chain is the
-    other three steps and the counts say the interface step was not run. That is a gap in what we
-    have measured, not a decision that those channels need no interface check."""
+    The third step has two forms. `published` is the 27 A Kv2.1 cutoff read off the distance table,
+    which exists for Kv2.1 alone. `s6_linker` is the generalized version, the lower S6 against its
+    own S4-S5 linker, which needs `interface_measures` from measure_interface() and works for all
+    three channels. `auto` takes the generalized one where the measures are given and falls back to
+    the published one for Kv2.1, which keeps the Kv2.1 numbers we have already published intact
+    when no measures are passed."""
     chan = get_channel(channel)
     label = label or f"{chan.name} cohort"
     distances = distances.copy()
@@ -321,7 +403,16 @@ def run_chain(distances: pd.DataFrame, convergence: pd.DataFrame, *, channel: st
     kept, counts["convergence"] = apply_convergence(distances, convergence)
     kept, counts["filter_ring"] = apply_filter_ring(kept, chan, threshold_A=ring_threshold_A)
 
-    if chan.interface_qc:
+    mode = interface_mode
+    if mode == "auto":
+        mode = "s6_linker" if interface_measures is not None else ("published" if chan.interface_qc else "none")
+    if mode in ("s6_linker", "both"):
+        if interface_measures is None:
+            raise ValueError(f"interface_mode={interface_mode!r} needs interface_measures from measure_interface()")
+        threshold = chan.s6_linker_max_A if s6_linker_threshold_A is None else s6_linker_threshold_A
+        kept, counts["s6_linker_qc"] = apply_s6_linker_qc(
+            kept, interface_measures, threshold_A=threshold, trajectory_level=True)
+    if mode in ("published", "both") and chan.interface_qc:
         before = kept["trajectory"].nunique()
         kept = apply_kv21_interface_qc(kept, threshold_A=interface_threshold_A, trajectory_level=True)
         counts["interface_qc"] = {
@@ -330,7 +421,10 @@ def run_chain(distances: pd.DataFrame, convergence: pd.DataFrame, *, channel: st
             "threshold_A": float(interface_threshold_A)}
     else:
         counts["interface_qc"] = {"trajectories_rejected": 0, "models_rejected": 0,
-                                  "not_run": f"no published interface cutoff for {chan.name}"}
+                                  "not_run": f"interface_mode={mode} for {chan.name}"}
+    counts.setdefault("s6_linker_qc", {"trajectories_rejected": 0, "models_rejected": 0,
+                                       "not_run": f"interface_mode={mode}"})
+    counts["interface_mode"] = mode
 
     representatives = kept.loc[kept["is_representative"]].copy()
     representatives.attrs.update(kept.attrs)
@@ -345,6 +439,7 @@ def run_chain(distances: pd.DataFrame, convergence: pd.DataFrame, *, channel: st
           f"{counts['convergence']['trajectories_out']} converged, "
           f"-{counts['filter_ring']['trajectories_rejected']} filter ring, "
           f"-{counts['interface_qc']['trajectories_rejected']} interface, "
+          f"-{counts['s6_linker_qc']['trajectories_rejected']} S6-linker, "
           f"-{counts['topology']['representatives_in'] - counts['topology']['representatives_out']} topology; "
           f"{len(surviving)} surviving")
     return ChainResult(representatives=representatives, retained=retained, topology=verdicts,
