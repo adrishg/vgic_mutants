@@ -204,10 +204,18 @@ def _screen_module():
     His pipeline wants one ColabFold .tar.gz per condition and ours are loose PDB trees on Quobyte,
     so the integration borrows the geometry and leaves the plumbing: the checks take plain coordinate
     arrays and need none of his config or archive handling."""
-    pipeline = Path(__file__).resolve().parent / "pipeline"
+    here = Path(__file__).resolve().parent
+    pipeline = here / "pipeline"
     if str(pipeline) not in sys.path:
         sys.path.insert(0, str(pipeline))
-    import screen                                                      # noqa: PLC0415
+    try:
+        import screen                                                  # noqa: PLC0415
+    except ImportError:
+        # His file imports three modules at module scope that the checks never use, and one of them
+        # pulls in gemmi, which the ColabFold environment on Hive does not have. Stand-ins for those
+        # names, and only then, so where the real pipeline can be imported it is the one used.
+        sys.path.insert(0, str(here / "screen_shim"))
+        import screen                                                  # noqa: PLC0415
     return screen
 
 
