@@ -137,7 +137,13 @@ def fe_covariance(X: np.ndarray, pairs: np.ndarray, var_pair: float, var_noise: 
 
 def fit_measure(groups: pd.DataFrame, measure: str, control: str, conditions=None) -> dict:
     """Fit one measure (module docstring, items 2-4) and compare each condition with the control."""
-    d = groups[np.isfinite(groups[measure]) & (groups[measure] > 0)].reset_index(drop=True)
+    usable = np.isfinite(groups[measure]) & (groups[measure] > 0)
+    # Why these are counted apart: a group of one model has no spread (D-078 sets no minimum group size, so
+    # nothing upstream stops this), and dropping it here removes a whole condition x network x recycle cell
+    # from the design rather than just changing a value. With a screen in front of the statistics that is
+    # how a filter quietly edits the experiment, so the count is logged and written into models.json.
+    too_small = int((~usable & (groups.n.to_numpy() < 2)).sum())
+    d = groups[usable].reset_index(drop=True)
     present = list(dict.fromkeys(d.condition))
     order = [c for c in (conditions or present) if c in present]
     nets = sorted(d.network.unique())
@@ -183,7 +189,9 @@ def fit_measure(groups: pd.DataFrame, measure: str, control: str, conditions=Non
         R = C / np.outer(sd, sd)
     else:
         R = np.zeros((0, 0))
-    info = {"groups": int(len(d)), "groups_without_value": int(len(groups) - len(d)), "pairs": int(n_pairs),
+    info = {"groups": int(len(d)), "groups_without_value": int(len(groups) - len(d)),
+            "groups_dropped_too_small": too_small,
+            "groups_dropped_other": int(len(groups) - len(d) - too_small), "pairs": int(n_pairs),
             "conditions": int(n_conds), "networks": int(len(nets)), "var_pair": var_pair, "var_noise": var_noise,
             "converged": bool(fit.converged)}
     return {"comparisons": comparisons, "R": R, "df": int(df), "info": info}
@@ -329,7 +337,8 @@ def _build(conf: Config, folder: Path, log: Log) -> dict:
         i = f["info"]
         per_measure[m] = {**i, "df": f["df"], "cutoff": crit, "comparisons": int(c.t.notna().sum()),
                           "significant": int(c.significant.sum())}
-        log(f"  {m}: {i['groups']} groups ({i['groups_without_value']} without a value), {i['pairs']} pairs, "
+        log(f"  {m}: {i['groups']} groups ({i['groups_without_value']} without a value, of which "
+            f"{i['groups_dropped_too_small']} held fewer than 2 models), {i['pairs']} pairs, "
             f"df {f['df']}; variances: pair {i['var_pair']:.4f}, noise {i['var_noise']:.4f}; cutoff |t| > {crit:.3f}; "
             f"{per_measure[m]['significant']} of {per_measure[m]['comparisons']} significant"
             + ("" if i["converged"] else "; WARNING: the fit did not converge"))
