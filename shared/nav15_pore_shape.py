@@ -214,16 +214,16 @@ def plot_shape_landscape(
             zorder=4,
         )
 
-    markers = ("o", "s", "D", "^", "v", "P")
-    for marker, (_, row) in zip(markers, experimental_metrics.iterrows()):
+    for _, row in experimental_metrics.iterrows():
+        style = NAV15_EXPERIMENTAL_STYLES[row["dataset"]]
         toxin = row["dataset"] == "8T6L"
         ax.scatter(
             row["mean_diagonal_A"],
             row["side_aspect_ratio"],
             s=65 if not toxin else 55,
-            marker=marker,
+            marker=style["marker"],
             facecolor="white" if not toxin else "#F1D8A8",
-            edgecolor="#4A3657" if not toxin else "#8C6D31",
+            edgecolor=style["color"],
             linewidth=1.3,
             zorder=6,
             label=f"{row['dataset']} | {row['state']}",

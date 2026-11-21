@@ -422,7 +422,8 @@ best_contacts.to_csv(TABLE/'l403a_best_shortest_contact_matches_to_8SDA_v5.csv',
 
 contact_order=['F412D','L316D','F412B']; x=np.arange(len(contact_order))
 fig,ax=plt.subplots(figsize=(8.2,4.8))
-ax.plot(x,[reference[label] for label in contact_order],marker='s',ms=7,lw=1.8,
+ax.plot(x,[reference[label] for label in contact_order],ms=7,lw=1.8,
+        marker=experimental_reference_style('8SDA')['marker'],
         color=experimental_reference_style('8SDA')['color'],
         label='8SDA — experimental L403A mutant Kv2.1')
 for protocol in PROTOCOL_ORDER:
