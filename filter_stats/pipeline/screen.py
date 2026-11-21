@@ -42,8 +42,8 @@ cut out by the config's segments. The screen works on four-fold channels only (3
 
 Writes <output>/screen/: verdicts.csv (one row per model: each check's value and result, whether the
 user named the prediction, the first failing reason, kept), summary.json (kept per condition, recycle
-and network; removed per condition, recycle, network and reason; the named predictions; the
-structure's missing residues), manifest.json (written last: the settings, the reference, checksums of
+and network; removed per condition, recycle, network and reason; the named predictions; the models the
+screen could not judge at all, with their errors; the structure's missing residues), manifest.json (written last: the settings, the reference, checksums of
 step 1's files and of verdicts.csv, and of this file's code, so step 2 can tell whether the screen is
 up to date) and screen.log. Running the screen removes step 2's results, which belonged to the old
 verdicts.
@@ -76,6 +76,8 @@ LINKER, FILTER = ELEMENTS.index("linker"), ELEMENTS.index("filter")
 PARTS = (*ELEMENTS, "vsd", "pd", "s5", "s6")              # every coordinate set a subunit holds
 STEP1_FILES = ("dv.csv", "sites.csv", "coords.npy")
 SCREEN_FILES = ("manifest.json", "verdicts.csv", "summary.json", "screen.log")
+CHECK_FAILED = "not_judged"       # the screen could not judge the model at all, as against failing a check
+ERRORS_LOGGED = 20                # how many of those to spell out in the log; summary.json holds them all
 
 
 class ScreenError(Exception):
@@ -559,16 +561,37 @@ def _build(conf: Config, folder: Path, log: Log) -> dict:
         log(f"  no structure in the config: running {run} on each model itself; not run: "
             f"{[c for c in on if c in NEED_REFERENCE]} (D-072)")
 
-    rows = []
+    rows, failed = [], []
     for i in screened:
         key = (dv.condition.iloc[i], int(dv.model.iloc[i]), int(dv.seed.iloc[i]))
-        v = judge(split(X[i], us, conf.segments))
-        reason = "named" if key in named else next((c for c in run if not v[f"{c}_ok"]), "")
+        subs = split(X[i], us, conf.segments)
         row = {"condition": key[0], "model": key[1], "seed": key[2], "recycle": int(dv.recycle.iloc[i])}
+        try:
+            v = judge(subs)
+        except Exception as exc:
+            # One model whose coordinates the geometry cannot handle (a NaN reaching the fit in
+            # own_place, say, which raises LinAlgError) used to end the whole run, after hours of work
+            # and with nothing written. Record it as its own verdict instead: the model is removed, the
+            # reason says it was the screen that could not judge it rather than the model that failed a
+            # check, and the run goes on.
+            failed.append({"condition": key[0], "model": key[1], "seed": key[2],
+                           "recycle": int(dv.recycle.iloc[i]), "error": f"{type(exc).__name__}: {exc}"})
+            if len(failed) <= ERRORS_LOGGED:
+                log(f"  WARNING: cannot judge {key[0]} model {key[1]} seed {key[2]} recycle "
+                    f"{int(dv.recycle.iloc[i])}: {type(exc).__name__}: {exc}")
+            for c in CHECKS:
+                row[c], row[f"{c}_ok"] = np.nan, np.nan
+            rows.append({**row, "named": key in named, "reason": CHECK_FAILED, "kept": False})
+            continue
+        reason = "named" if key in named else next((c for c in run if not v[f"{c}_ok"]), "")
         for c in CHECKS:
             row[c], row[f"{c}_ok"] = v.get(c, np.nan), v.get(f"{c}_ok", np.nan)
         rows.append({**row, "named": key in named, "reason": reason, "kept": reason == ""})
     verdicts = pd.DataFrame(rows)
+    if failed:
+        log(f"  {len(failed)} model(s) could not be judged and were removed with reason {CHECK_FAILED!r}"
+            + (f" (the first {ERRORS_LOGGED} are logged above; all of them are in summary.json)"
+               if len(failed) > ERRORS_LOGGED else ""))
 
     if conf.reference is not None:
         reference = {"kind": "reference", "missing_residues": {str(k): v for k, v in ref.missing.items()},
@@ -579,6 +602,7 @@ def _build(conf: Config, folder: Path, log: Log) -> dict:
 
     summary = {"checks_run": run, "checks_not_run": [c for c in CHECKS if c not in run], "reference": reference,
                "models": len(verdicts), "models_kept": int(verdicts.kept.sum()),
+               "models_not_judged": len(failed), "not_judged": failed,
                "kept": {}, "removed": {}, "removed_by_reason": {},
                "named": [{"condition": c, "model": m, "seed": s, "reason": r} for c, m, s, r in settings.omitted]}
     for cond in conf.conditions:
