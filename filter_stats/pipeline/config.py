@@ -38,6 +38,8 @@ relative to the config file; residue ranges are inclusive and in UniProt numberi
     box_corners = true
     s6_on_own_s5 = true
     filter_quarter = false
+    first_recycle = 1                       # lowest recycle judged by the screen and carried into the
+                                            # statistics; 0 includes recycle 0 (D-063)
     omit = "<file>"                         # optional CSV: condition,model,seed,reason (removed by hand)
     [segments]                              # with [screen]: one subunit's segments, for four chains
     S1 = [<start>, <end>]                   # ... S2, S3, S4, linker, S5, pore_helix, filter,
@@ -77,6 +79,7 @@ RESERVED = {"condition", "model", "seed", "recycle", "prediction", "mapping", "c
 TOP_KEYS = {"name", "uniprot_fasta", "output_dir", "model_chains", "reference", "ranges", "regions", "design",
             "frame", "conditions", "screen", "segments", "statistics"}
 MIN_MODELS_DEFAULT = 10                                  # D-068
+FIRST_RECYCLE_DEFAULT = 1                                # D-063; 0 judges recycle 0 as well
 # the topology screen (D-063): the ten segments of a subunit, in sequence order, and the checks' switches
 ELEMENTS = ("S1", "S2", "S3", "S4", "linker", "S5", "pore_helix", "filter", "S6_upper", "S6_lower")
 SCREEN_SWITCHES = {"wiring": True, "own_place": True, "box_corners": True, "s6_on_own_s5": True,
@@ -120,6 +123,7 @@ class Screen:                                            # the switches' default
     box_corners: bool
     s6_on_own_s5: bool
     filter_quarter: bool
+    first_recycle: int = FIRST_RECYCLE_DEFAULT           # lowest recycle judged (D-063)
     omit: Path | None = None                             # CSV of predictions removed by hand
     omitted: list = field(default_factory=list)          # its rows: (condition, model, seed, reason)
 
@@ -342,7 +346,7 @@ def _screen(value, base: Path, conditions: list) -> Screen:
     """[screen] -> Screen, with its omit file read and checked against the conditions."""
     if not isinstance(value, dict):
         raise ConfigError("[screen] must be a table")
-    _no_unknown_keys(value, {"domain_swapped", "omit", *SCREEN_SWITCHES}, "[screen]")
+    _no_unknown_keys(value, {"domain_swapped", "omit", "first_recycle", *SCREEN_SWITCHES}, "[screen]")
     swapped = _need(value, "domain_swapped", "[screen]")
     if not isinstance(swapped, bool):
         raise ConfigError(f"[screen] domain_swapped must be true or false, got {swapped!r}")
@@ -352,6 +356,9 @@ def _screen(value, base: Path, conditions: list) -> Screen:
         if not isinstance(v, bool):
             raise ConfigError(f"[screen] {key} must be true or false, got {v!r}")
         switches[key] = v
+    first = value.get("first_recycle", FIRST_RECYCLE_DEFAULT)
+    if not isinstance(first, int) or isinstance(first, bool) or first < 0:
+        raise ConfigError(f"[screen] first_recycle must be a whole number, 0 or more, got {first!r}")
     omit, omitted = None, []
     if "omit" in value:
         omit = _existing_file(base, value["omit"], "[screen] omit")
@@ -378,7 +385,7 @@ def _screen(value, base: Path, conditions: list) -> Screen:
                 raise ConfigError(f"[screen] omit: {omit} line {k} names condition {cond!r} model {model} seed {seed} "
                                   f"a second time")
             omitted.append((cond, int(model), int(seed), reason))
-    return Screen(domain_swapped=swapped, omit=omit, omitted=omitted, **switches)
+    return Screen(domain_swapped=swapped, first_recycle=first, omit=omit, omitted=omitted, **switches)
 
 
 # --------------------------------------------------------------------------- loading
@@ -590,6 +597,7 @@ def screen_settings(config: Config) -> dict | None:
     s = config.screen
     if s is None:
         return None
-    return {"domain_swapped": s.domain_swapped, **{k: getattr(s, k) for k in SCREEN_SWITCHES},
+    return {"domain_swapped": s.domain_swapped, "first_recycle": s.first_recycle,
+            **{k: getattr(s, k) for k in SCREEN_SWITCHES},
             "omitted": [list(r) for r in s.omitted],
             "segments": [{k: list(v) for k, v in t.items()} for t in config.segments]}

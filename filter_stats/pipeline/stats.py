@@ -81,9 +81,11 @@ STEP_ERRORS = (StatsInputError, StatsDesignError, *STEP1_ERRORS)
 
 # =========================================================================== one value per group
 
-def group_values(dv: pd.DataFrame, measures: list) -> pd.DataFrame:
-    """One row per group (condition, network, recycle >= 1): pair, number of models and each measure's value."""
-    d = dv[dv.recycle >= 1]
+def group_values(dv: pd.DataFrame, measures: list, first_recycle: int = 1) -> pd.DataFrame:
+    """One row per group (condition, network, recycle >= first_recycle): pair, number of models and each
+    measure's value. first_recycle must match the screen's, or the statistics analyse a different set
+    from the one the screen passed (D-063)."""
+    d = dv[dv.recycle >= first_recycle]
     rows = []
     for (cond, net, rec), g in d.groupby(["condition", "model", "recycle"], sort=True):
         row = {"condition": cond, "network": net, "recycle": int(rec), "pair": f"{cond}:{net}", "n": len(g)}
@@ -283,7 +285,8 @@ def _build(conf: Config, folder: Path, log: Log) -> dict:
     names = measures(conf, dv)
     if not names:
         raise StatsInputError("step 2's results hold no spread or offset to test")
-    groups = group_values(dv, names)
+    first = conf.screen.first_recycle if conf.screen is not None else 1
+    groups = group_values(dv, names, first)
     alpha_m = ALPHA / len(names)
     order = [c.name for c in conf.conditions]
     log(f"  {len(names)} measures: the 5% is split evenly, {100 * alpha_m:.3g}% each (Bonferroni), "

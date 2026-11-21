@@ -5,7 +5,8 @@ Run:  python -B pipeline/screen.py --config datasets/<dataset>/<dataset>.toml
 It runs after step 1 (`build_dv.py`) and before step 2 (`region_dv.py`), which then uses the kept
 models only.
 
-Each model (one prediction at one recycle) is judged on its own, at every recycle except 0 (D-063
+Each model (one prediction at one recycle) is judged on its own, at every recycle from
+[screen] first_recycle upward (default 1, which leaves recycle 0 unjudged; D-063
 3h). The checks, exactly as first built and validated (D-063, "Decision"; thresholds fixed here, 3d):
 1. wiring: every voltage sensor (S1 start to S4 end) touches the pore domain (S5 start to S6 end)
    it should: that pore domain has strictly more Cα pairs within 8 Å than any other (ties and no
@@ -530,9 +531,10 @@ def _build(conf: Config, folder: Path, log: Log) -> dict:
     dv, us = step1["dv"], np.array(step1["us"])
     n_chains = len(conf.model_chains)
     X = step1.pop("coords").astype(np.float64).reshape(len(dv), n_chains, len(us), 3)
-    screened = np.nonzero((dv.recycle >= 1).to_numpy())[0]
+    first = settings.first_recycle
+    screened = np.nonzero((dv.recycle >= first).to_numpy())[0]
     if len(screened) == 0:
-        raise ScreenError("step 1's results hold no model after recycle 0; there is nothing to screen")
+        raise ScreenError(f"step 1's results hold no model at recycle {first} or later; there is nothing to screen")
     present = set(zip(dv.condition, dv.model.astype(int), dv.seed.astype(int)))
     named = {(c, m, s): r for c, m, s, r in settings.omitted}
     absent = sorted(set(named) - present)

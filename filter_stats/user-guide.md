@@ -63,6 +63,7 @@ Paths are relative to the config file. Residue numbers are UniProt numbers; rang
 | `[screen] domain_swapped` | with a screen | `true`: each voltage sensor sits on the next pore domain clockwise seen from outside (Kv1–9, KCNQ, Nav, Cav); `false`: on its own (KCNH, HCN, BK) |
 | `[screen] wiring`, `own_place`, `box_corners`, `s6_on_own_s5` | no (default `true`) | Switch a check off with `false` (below) |
 | `[screen] filter_quarter` | no (default `false`) | Switch this check on with `true` |
+| `[screen] first_recycle` | no (default `1`) | Lowest recycle the screen judges, and the lowest the statistics then use. `0` judges recycle 0 as well; use it when an upstream convergence filter can select recycle 0, or those models pass through unjudged |
 | `[screen] omit` | no | A CSV of predictions removed by hand: header `condition,model,seed,reason` |
 | `[segments]` | with a screen | One subunit's segments, in order, inside `measure`: `S1`, `S2`, `S3`, `S4`, `linker`, `S5`, `pore_helix`, `filter`, `S6_upper`, `S6_lower`, each `[start, end]` |
 | `[[segments]]` | instead, for one chain | Four such tables, one per repeat (DI–DIV of a Nav or Cav channel) |
