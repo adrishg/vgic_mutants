@@ -6,8 +6,12 @@
                                      representative, and it and everything after it are retained
     2. selectivity-filter ring       trajectory rejected if any retained recycle exceeds 20 A
                                      (Kv2.1 G377, Cav1.2 EEEE, Nav1.5 DEKA)
-    3. pore-VSD interface, 27 A      trajectory level: one bad recycle rejects the whole trajectory
-                                     (Kv2.1 only - no cutoff is published for the other two)
+    3. pore-VSD interface            trajectory level: one bad recycle rejects the whole trajectory.
+                                     Two forms. The published Kv2.1 one thresholds S6's end against
+                                     the residues before S1 at 27 A, read off the distance table.
+                                     The generalized one thresholds the lower S6 against its own
+                                     S4-S5 linker at 12 A, measured from the models, and works for
+                                     all three channels because that contact exists in all three.
     4. topology screen               Brandon Harris's reference-free checks (filter_stats/pipeline/
                                      screen.py), judging each surviving trajectory's representative
 
@@ -30,6 +34,10 @@ measured in 26-11/filterComparison/FILTER_ORDER_FINDINGS.md section 9, neither o
 
 The topology screen judges only the representative, not all eleven recycles. That is about eleven
 times cheaper, but the reason is that the representative is the unit the rest of the analysis reports.
+
+Only the published form is a cutoff anyone has published. The generalized form was calibrated on
+fourteen experimental structures (channels.py, item 3) and is the only one Nav1.5 and Cav1.2 can
+take, so run_chain() offers both and the sweep in scripts/filtering/hive compares them.
 
 A note on the distance columns: their names carry the residue name, so position 405 is LEU405 in the
 wild type and ALA405 in L403A. Match them by position with ring_columns(), never by residue name.
