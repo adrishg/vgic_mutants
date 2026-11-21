@@ -70,20 +70,51 @@ def is_kept_in_repo(rel_path: str | Path) -> bool:
     return len(parts) > 1 and parts[1] in _KEPT_SECOND
 
 
-def hf_path(rel_path: str | Path) -> str:
-    """Map a repository-relative path to its path inside the dataset."""
+# The published dataset does not spell every channel the way this repository
+# does, and the CaV1.2 buckets carry a cohort level the others do not.  Rather
+# than pin one spelling, every known layout is tried in turn (D-081).
+_CHANNEL_ALIASES = {
+    "cav12": ("CaV1.2", "Cav1.2"),
+    "kv21": ("Kv2.1",),
+    "nav15": ("Nav1.5", "NaV1.5"),
+}
+
+_BUCKET_SUBDIRS = ("", "50pct")
+
+
+def hf_candidates(rel_path: str | Path) -> list[str]:
+    """Every dataset path a repository-relative path might be published under.
+
+    The first entry is the canonical layout; the rest are the spellings and
+    cohort subdirectories the dataset actually uses.  Callers try them in
+    order, so adding one here can never break a path that already resolves.
+    """
     parts = Path(rel_path).parts
     if len(parts) < 2:
         raise ValueError(f"Cannot map {rel_path!r} to a dataset path")
 
-    channel = _CHANNELS.get(parts[0])
-    if channel is None:
-        return str(Path(*parts))
+    if parts[0] not in _CHANNELS:
+        return [str(Path(*parts))]
 
     bucket = _BUCKETS.get(parts[1])
     if bucket is None:
         raise ValueError(f"No dataset bucket defined for {parts[0]}/{parts[1]}")
-    return str(Path("data") / channel / bucket / Path(*parts[2:]))
+
+    names = (_CHANNELS[parts[0]], *_CHANNEL_ALIASES.get(parts[0], ()))
+    remainder = Path(*parts[2:])
+    candidates = []
+    for channel in dict.fromkeys(names):
+        for subdir in _BUCKET_SUBDIRS:
+            base = Path("data") / channel / bucket
+            candidate = str((base / subdir / remainder) if subdir else (base / remainder))
+            if candidate not in candidates:
+                candidates.append(candidate)
+    return candidates
+
+
+def hf_path(rel_path: str | Path) -> str:
+    """Map a repository-relative path to its canonical path inside the dataset."""
+    return hf_candidates(rel_path)[0]
 
 
 def _is_lfs_pointer(path: Path) -> bool:
@@ -145,18 +176,26 @@ def resolve(rel_path: str | Path) -> Path:
 def _fetch(rel: Path, destination: Path) -> Path:
     from huggingface_hub import hf_hub_download
 
-    try:
-        downloaded = hf_hub_download(
-            repo_id=HF_REPO,
-            repo_type="dataset",
-            revision=HF_REVISION,
-            filename=hf_path(rel),
-        )
-    except Exception as error:  # noqa: BLE001 - re-raised with the path for context
+    candidates = hf_candidates(rel)
+    downloaded = None
+    last_error: Exception | None = None
+    for candidate in candidates:
+        try:
+            downloaded = hf_hub_download(
+                repo_id=HF_REPO,
+                repo_type="dataset",
+                revision=HF_REVISION,
+                filename=candidate,
+            )
+            break
+        except Exception as error:  # noqa: BLE001 - reported with every path tried
+            last_error = error
+    if downloaded is None:
+        tried = "\n  ".join(candidates)
         raise DataUnavailable(
             f"{rel} is not in the working tree and could not be fetched from "
-            f"{HF_REPO} as {hf_path(rel)}: {error}"
-        ) from error
+            f"{HF_REPO}. Tried:\n  {tried}\nLast error: {last_error}"
+        ) from last_error
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     if not destination.exists():
