@@ -237,7 +237,7 @@ def plot_shape_landscape(
     )
     ax.set(
         xlabel="Mean cross-pore diagonal (Å)  |  opening-size proxy",
-        ylabel="Side aspect ratio  |  1 = square; larger = more rectangular",
+        ylabel="Side aspect ratio\n1 = square; larger = more rectangular",
         title=r"$\mathrm{Na}_{\mathrm{V}}1.5$ intracellular gate | pore size and four-domain shape",
     )
     ax.legend(
@@ -309,7 +309,7 @@ def plot_shape_distributions(
     ax.axhline(1.0, color="#8C7A96", linestyle=":", linewidth=1)
     ax.set(
         xlabel="",
-        ylabel="Side aspect ratio  |  1 = square; larger = more rectangular",
+        ylabel="Side aspect ratio\n1 = square; larger = more rectangular",
         title=r"$\mathrm{Na}_{\mathrm{V}}1.5$ intracellular gate | square-to-rectangle distributions",
     )
     ax.tick_params(axis="x", rotation=24)
