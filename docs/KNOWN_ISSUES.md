@@ -41,3 +41,27 @@
   what was applied. Where the applied and registered sizes differ, the registry gives both and the
   manuscript's Supplementary Table S1 reports the applied size.
 
+## 2026-11-22: stale 50pct_reanalysis_2026-11-12 figures removed from HuggingFace
+
+All 23 image files (5 PDF + 18 PNG) under
+`data/Kv2.1/extra/figures/50pct_reanalysis_2026-11-12/` and
+`data/Kv2.1/rmsf/figures/50pct_reanalysis_2026-11-12/` were deleted (HF commit
+`d10d3caa`). The dataset now holds no PNG or PDF of any kind: it carries models,
+archives and tables only. Dataset file count 18,342 -> 18,319.
+
+The `*_trajectory_medians.csv.gz` files in
+`data/Kv2.1/extra/conformation_analysis/50pct_reanalysis_2026-11-12/` were kept for
+now. The three masked ones were verified to come from the withdrawn 41-column
+`masked_v3_50pct` ensembles, not from `masked_common99_50pct`: recomputing per-trajectory
+medians from the published common99 raw distance tables reproduces only 5.7% (WT), 8.6%
+(L403A) and 5.7% (F412L) of cells exactly, and zero of 500 trajectories match in full.
+For reference, when only the convergence filter differs and the underlying ensemble is
+the same, 54% of cells still match exactly. The folder's own `run_manifest.json` records
+`"masked_policy": "corrected_data_pending_final_structural_qc_and_clashscore"`.
+
+The three vanilla medians files carry `"vanilla_policy": "unchanged_valid"` in the same
+manifest, and the vanilla ensembles were never regenerated. They could not be checked as
+cleanly, because only convergence-filtered vanilla distance tables are published, with no
+raw table to recompute from; against the filtered tables they reproduce 10-13% of cells,
+below the 54% filter-only baseline. Unresolved, and not a reason to delete them.
+
