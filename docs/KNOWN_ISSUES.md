@@ -15,13 +15,18 @@
   non-hydrogen side-chain atoms for the arginine substitution.
 - MolProbity source tables do not record the invoking software version, options, or hydrogen
   treatment. Those run fields remain `not recorded` rather than being reconstructed by assumption.
-- The Kv2.1 50% masked ensembles analyzed for the paper were generated from a 41-position subset of
-  the registered 99-position `kv21_common` design, not from the full design. Only 4 of the 48
-  positions in the 370-417 pore-helix/S6 block were masked, so the pore domain received 6.7% residue
-  coverage against 36.2% in the earlier 100% cohort. This affects all three sequence backgrounds
-  (the mutants add their mutated position at 100%, giving 42). Vanilla cohorts are unaffected. The
-  applied positions are recorded in `docs/MASK_REGISTRY.tsv`; a replacement run at the full 99
-  positions is in progress for L403A.
+- RESOLVED 2026-11-21. The Kv2.1 50% masked ensembles analyzed up to 2026-11-20 were generated from
+  a 41-position subset of the registered 99-position `kv21_common` design, not from the full design.
+  Only 4 of the 48 positions in the 370-417 pore-helix/S6 block were masked, so the pore domain
+  received 6.7% residue coverage against 36.2% in the earlier 100% cohort. This affected all three
+  sequence backgrounds (the mutants added their mutated position at 100%, giving 42); vanilla cohorts
+  were unaffected. The replacement run at the full 99 positions has finished for all three
+  backgrounds and is what the dataset now publishes: `26-11-20` for WT and F412L, `26-11-19` for
+  L403A, under the `masked_common99_50pct` cohort name. Its applied positions, read from every
+  `*.a3m.audit.json`, match the registered design position for position (256-260, 276-280, 288-328,
+  370-417), giving full 48/48 pore coverage. The 41-position tables have been withdrawn from the
+  companion dataset. Because each mutated position falls inside the 99-position design, the mutant
+  cohorts apply it deterministically and total 99 rather than 100.
 - The NaV1.5 QQQ standard cohort was masked at 296 positions, not the 306 its design specifies: the
   293-position standard set plus the three substituted motif positions 1169-1171, without the rest
   of the 1164-1176 block. Positions 1164-1168 and 1172-1176 are covered by nothing else, because the
