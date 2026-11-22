@@ -66,11 +66,15 @@ published dataset spells the channel `CaV1.2` and nests each bucket under a
 
 The nine remaining failures need two file families published:
 
-1. `*_all_ok_rmsd_3A_structural_interface_qc.csv` for Kv2.1, vanilla and
-   masked v3 50%, all three backgrounds. Blocks seven notebooks, including both
-   Figure 2B panels, the S6 shift comparison, S8, S9 and S10. These exist on
-   Hive from the filter-chain work; they are in neither the working tree nor
-   the dataset.
+1. `*_all_ok_rmsd_3A_structural_interface_qc.csv` for Kv2.1, vanilla and the
+   99-column masked 50% set, all three backgrounds. Blocks seven notebooks, including both
+   Figure 2B panels, the S6 shift comparison, S8, S9 and S10. These exist
+   nowhere yet and have to be built. Hive holds the filter-chain session's
+   `<cohort>_chain_qc.csv`, which is a different artifact from the published
+   chain's `_structural_interface_qc.csv` that the notebooks resolve; build
+   them with `scripts/filtering/build_kv21_structural_interface_qc_50pct.py`.
+   A correct build gives 203/500 WT, 393/500 L403A and 277/500 F412L retained
+   at 99 columns, with the G377 ring rejecting none in any cohort.
 2. Nav1.5 distances at all. `data/Nav1.5/` on Hugging Face holds only `rmsd`:
    no `distances`, no `convergence`, no `rmsf`. Blocks the Figure 5 pore panels
    and the pore-shape analysis.
