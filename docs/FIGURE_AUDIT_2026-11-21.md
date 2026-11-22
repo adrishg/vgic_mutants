@@ -73,8 +73,19 @@ The nine remaining failures need two file families published:
    `<cohort>_chain_qc.csv`, which is a different artifact from the published
    chain's `_structural_interface_qc.csv` that the notebooks resolve; build
    them with `scripts/filtering/build_kv21_structural_interface_qc_50pct.py`.
-   A correct build gives 203/500 WT, 393/500 L403A and 277/500 F412L retained
-   at 99 columns, with the G377 ring rejecting none in any cohort.
+   Two definitions of step 1 are in play and they give different numbers, so
+   say which one a table was built on. Feeding the builder `all_ok_models.csv`
+   retains 203/500 WT, 393/500 L403A, 277/500 F412L. Feeding it
+   `*_all_ok_rmsd_3A.csv`, which is what it takes by design and what the
+   notebooks consume, retains 219/470, 407/471, 320/442 — the denominator
+   shrinks because that file also requires aligned coverage >= 0.90. The
+   shipped tables use the second, because the 41-column release it replaces
+   used it too and the two stay comparable. **The denominators differ per
+   cohort (470 / 471 / 442), so a retained *fraction* is not comparable across
+   cohorts without saying so; quote counts, or state the denominator.**
+   The G377 ring rejects nothing under either definition. It rejects 0/4/2 only
+   if the convergence step is skipped altogether, which is a sign the step was
+   dropped, not a property of the cohort.
 2. Nav1.5 distances at all. `data/Nav1.5/` on Hugging Face holds only `rmsd`:
    no `distances`, no `convergence`, no `rmsf`. Blocks the Figure 5 pore panels
    and the pore-shape analysis.
