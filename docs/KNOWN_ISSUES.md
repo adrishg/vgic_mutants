@@ -26,10 +26,12 @@
   `*.a3m.audit.json`, match the registered design position for position (256-260, 276-280, 288-328,
   370-417), giving full 48/48 pore coverage. The 41-position cohort has been withdrawn from the
   companion dataset in full: the distance and convergence tables, the coordinate shards and the
-  Kv2.1 50% coordinate archive. The replacement coordinates are not published yet, so the dataset
-  currently carries the common99 tables without their PDB models. Because each mutated position
-  falls inside the 99-position design, the mutant cohorts apply it deterministically and total 99
-  rather than 100.
+  Kv2.1 50% coordinate archive. The replacement coordinates were published on 2026-11-22 as one
+  models.tar.zst per sequence background under coordinates/Kv2.1/<variant>/masked_common99_50pct/,
+  packed on Hive and uploaded from there. L403A holds 5995 members rather than 6000 because two
+  models met the recycle tolerance early and wrote fewer intermediates; both have their final
+  structures and the cohort manifest names them. Because each mutated position falls inside the
+  99-position design, the mutant cohorts apply it deterministically and total 99 rather than 100.
 - The NaV1.5 QQQ standard cohort was masked at 296 positions, not the 306 its design specifies: the
   293-position standard set plus the three substituted motif positions 1169-1171, without the rest
   of the 1164-1176 block. Positions 1164-1168 and 1172-1176 are covered by nothing else, because the
