@@ -9,10 +9,12 @@
 #SBATCH --array=0-6
 #SBATCH --output=/quobyte/yarovoygrp/ahgz/vgic_mutants/scripts/filter_chain/logs/step23-%A_%a.out
 #SBATCH --error=/quobyte/yarovoygrp/ahgz/vgic_mutants/scripts/filter_chain/logs/step23-%A_%a.err
-# Steps 2 and 3 of Brandon's pipeline for one dataset: region_dv.py cuts the step 1 DVs into the
-# five regions and applies [screen], including our filter chain's omit file, then stats.py fits
+# The topology screen and steps 2 and 3 of Brandon's pipeline for one dataset. screen.py runs
+# first: step 2 refuses to start without its results, because the config has a [screen]. Then
+# region_dv.py cuts the step 1 DVs into the five regions and applies [screen], including our
+# filter chain's omit file, and stats.py fits
 # log(value) ~ condition * recycle + network with a condition:network random effect and runs the
-# Dunnett contrasts against the control. Both read what step 1 wrote for that dataset only, so the
+# Dunnett contrasts against the control. All three read what step 1 wrote for that dataset only, so
 # tasks share no file. Submit this with a dependency on the step 1 array.
 set -euo pipefail
 
@@ -34,7 +36,8 @@ eval "$($MAMBA shell hook --shell bash)"
 micromamba activate "$PREFIX"
 set -u
 
-echo "steps 2-3 on $NAME, started $(date) on $(hostname)"
+echo "screen and steps 2-3 on $NAME, started $(date) on $(hostname)"
+python "$P/screen.py" --config "$CONFIG"
 python "$P/region_dv.py" --config "$CONFIG"
 python "$P/stats.py" --config "$CONFIG"
 echo "finished $(date)"
