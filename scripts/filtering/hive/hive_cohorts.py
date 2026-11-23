@@ -238,10 +238,14 @@ def omit(chosen: list) -> None:
         got = omit_rows(cohort)
         print(f"{cohort['key']}: {len(got)} trajectories omitted", flush=True)
         rows += got
-    frame = pd.DataFrame(rows)
-    for dataset, part in frame.groupby("dataset"):
+    frame = pd.DataFrame(rows, columns=["dataset", "condition", "model", "seed", "reason"])
+    # Every dataset gets a file, including the ones the chain rejects nothing in. Writing only the
+    # non-empty ones leaves the config pointing at a path that does not exist, and "no rejects" is
+    # a result worth recording rather than an absence worth skipping.
+    for dataset in sorted({d for d, _c in FOR_CONFIG.values()}):
+        part = frame.loc[frame["dataset"] == dataset, ["condition", "model", "seed", "reason"]]
         path = OUT / f"{dataset}_omit.csv"
-        part[["condition", "model", "seed", "reason"]].to_csv(path, index=False)
+        part.to_csv(path, index=False)
         print(f"wrote {path} ({len(part)} rows)", flush=True)
 
 
