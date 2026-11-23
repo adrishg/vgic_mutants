@@ -701,11 +701,8 @@ def kv21_interaction(output: Path, bootstrap: int) -> None:
                 frame = read_csv(source)
                 frame = frame[frame.condition.eq(protocol)].copy()
             else:
-                relative = (
-                    f"kv21/dataDistances/26-02-11_Kv2.1_wt_{protocol}AF2_distances_"
-                    "all_ok_rmsd_3A_structural_interface_qc.csv"
-                )
-                frame = read_csv(ROOT / relative)
+                # Registry-resolved, so the masked arm is the active cohort.
+                frame = read_csv(ROOT / FINAL_DISTANCE_PATHS[f"kv21|WT|{protocol}"])
             frame = add_metadata(frame)
             frame[L403_COLUMNS] = frame[L403_COLUMNS].apply(pd.to_numeric, errors="coerce")
             frame["max_E423_N179_A"] = frame[L403_COLUMNS].max(axis=1)
