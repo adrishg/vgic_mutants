@@ -195,6 +195,51 @@ def _nexus_distance_columns(columns) -> list[str]:
     return selected
 
 
+# Backbone atoms left out of the nexus contact distances (side-chain
+# non-hydrogen definition, the same for models and experimental structures).
+BACKBONE_ATOMS = frozenset({"N", "CA", "C", "O", "OXT"})
+SIDE_CHAIN_PROTOCOL_KEYS = {
+    "vanilla": "vanilla", "masked": "masked_common99_50pct",
+}
+
+
+def _with_side_chain_distances(
+    frame: pd.DataFrame, sequence_key: str, protocol: str, distance_columns
+) -> pd.DataFrame:
+    """Replace the nexus distances by the side-chain-atom tables of 2026-11-22.
+
+    The vanilla (February 2026) and masked (November 2026) distance tables were
+    written with different atom selections. Both cohorts were recomputed on the
+    cluster with one generator (side-chain non-hydrogen atoms); the retained
+    models are still the rows of the final-QC table passed in.
+    """
+    arm = SIDE_CHAIN_PROTOCOL_KEYS[protocol]
+    parts = []
+    for stream in ("main", "extra"):
+        path = data_access.resolve(
+            "kv21/dataDistances/side_chain_20261122/"
+            f"Kv2.1_{sequence_key}_{arm}_nexus_side_chain_{stream}.csv"
+        )
+        part = pd.read_csv(path)
+        part["_model"] = _basename(part["pdb_file"])
+        parts.append(part.drop(columns="pdb_file").set_index("_model"))
+    table = parts[0]
+    extra = parts[1][[c for c in parts[1].columns if c not in table.columns]]
+    table = table.join(extra, how="outer")
+    missing = [c for c in distance_columns if c not in table.columns]
+    if missing:
+        raise KeyError(f"Side-chain table lacks {len(missing)} nexus columns: {missing[:3]}")
+    absent = set(frame["_model"]) - set(table.index)
+    if absent:
+        raise KeyError(
+            f"{len(absent)} retained {sequence_key} {protocol} models are not in "
+            "the side-chain distance table"
+        )
+    replaced = table.loc[frame["_model"], list(distance_columns)].reset_index(drop=True)
+    out = frame[["pdb_file", "_model"]].reset_index(drop=True)
+    return pd.concat([out, replaced], axis=1)
+
+
 def contact_signature(
     repo_root: str | Path,
     sequences: tuple[tuple[str, str], ...] = (("wt", "WT"), ("f412l", "F412L")),
@@ -240,6 +285,9 @@ def contact_signature(
             )
             frame = frame.loc[_basename(frame["pdb_file"]).isin(allowed)]
             frame["_model"] = _basename(frame["pdb_file"])
+            frame = _with_side_chain_distances(
+                frame, sequence_key, protocol, distance_columns
+            )
             for partner_number, partner in {
                 318: "L316 (S4–S5 linker)",
                 331: "L329 (neighboring S5)",
@@ -311,8 +359,10 @@ def experimental_contact_signature(repo_root: str | Path) -> pd.DataFrame:
                 candidates = []
                 for partner_chain in candidate_chains:
                     partner = model[partner_chain][(" ", partner_residue, " ")]
-                    atoms_a = [atom for atom in source if atom.element != "H"]
-                    atoms_b = [atom for atom in partner if atom.element != "H"]
+                    atoms_a = [atom for atom in source if atom.element != "H"
+                               and atom.get_id() not in BACKBONE_ATOMS]
+                    atoms_b = [atom for atom in partner if atom.element != "H"
+                               and atom.get_id() not in BACKBONE_ATOMS]
                     distance = min(float(atom_a - atom_b)
                                    for atom_a in atoms_a for atom_b in atoms_b)
                     candidates.append((distance, partner_chain))
@@ -426,7 +476,7 @@ def plot_contact_distances(model_table: pd.DataFrame, experimental: pd.DataFrame
         ])
         ax.set_xlabel("Hydrophobic-nexus interaction")
         ax.set_ylabel(
-            "Shortest heavy-atom distance (Å)" if panel_index == 0 else ""
+            "Shortest side-chain heavy-atom distance (Å)" if panel_index == 0 else ""
         )
         ax.set_title(protocol.lower(), fontweight="bold")
         legend = ax.get_legend()
@@ -561,7 +611,7 @@ def plot_f412l_contact_distances(
         f"{source}→{'A' if sequence == 'L403A' else 'L'}403\nclosest neighboring S6",
     ])
     ax.set_xlabel("Hydrophobic-nexus interaction")
-    ax.set_ylabel("Shortest heavy-atom distance (Å)")
+    ax.set_ylabel("Shortest side-chain heavy-atom distance (Å)")
     automatic_legend = ax.get_legend()
     if automatic_legend is not None:
         automatic_legend.remove()

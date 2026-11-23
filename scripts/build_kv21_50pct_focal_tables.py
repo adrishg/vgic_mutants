@@ -11,7 +11,7 @@ Outputs (in ``$VGIC_DATA_ROOT``):
   GLU425/ASN181), with the maximum and the number of subunits above the
   experimentally derived 12.841 Å cutoff.
 * ``kv21/dataDistances/analysis/F412L_nexus_shortest_contacts_long.csv``:
-  per-structure shortest heavy-atom distance from L412 (model 414) to the
+  per-structure shortest side-chain non-hydrogen distance from L412 (model 414) to the
   same-subunit L316 (318) and to the closest neighboring-subunit L329 (331)
   and L403 (405), using the column selection of ``shared.kv21_nexus_analysis``.
 """
@@ -31,7 +31,10 @@ sys.path.insert(0, str(REPO))
 
 from shared import data_access  # noqa: E402
 from shared.dataset_selection import filtered_masked_distance_path  # noqa: E402
-from shared.kv21_nexus_analysis import _nexus_distance_columns  # noqa: E402
+from shared.kv21_nexus_analysis import (  # noqa: E402
+    _nexus_distance_columns,
+    _with_side_chain_distances,
+)
 
 SHIFT_CUTOFF_A = 12.84133701269344
 L403_COLUMNS = [f"CA_CA_{c}_GLU425_CA-{c}_ASN181_CA" for c in "ABCD"]
@@ -75,6 +78,12 @@ def main() -> None:
         header = pd.read_csv(path, nrows=0).columns
         columns = _nexus_distance_columns(header)
         frame = pd.read_csv(path, usecols=["pdb_file", *columns], low_memory=False)
+        # One atom definition for both protocols: side-chain non-hydrogen
+        # atoms, recomputed on the cluster on 2026-11-22.
+        frame["_model"] = frame.pdb_file.map(lambda p: Path(str(p)).name)
+        paths = frame.set_index("_model")["pdb_file"]
+        frame = _with_side_chain_distances(frame, "f412l", protocol, columns)
+        frame["pdb_file"] = frame["_model"].map(paths).to_numpy()
         for partner, label in CONTACT_LABELS.items():
             chosen = [c for c in columns if re.search(fr"(?:^|[A-Z]){partner}[A-D](?:-|$)", c)]
             nearest = frame[chosen].apply(pd.to_numeric, errors="coerce").min(axis=1)

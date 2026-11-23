@@ -128,6 +128,12 @@ def paper_configs(repo_root: str | Path):
             "masked": root / filtered_masked_distance_path(root, "kv21", "WT"),
             "colors": (KV21_PALETTE["WT_VAN"], KV21_PALETTE["WT_HM"]),
             "references": ("8SD3:", "9O10:", "9O11:", "9O12:", "9O13:"),
+            # The wild-type tables carry the F236-R308 distance for chain A
+            # only; chains B-D were computed from the same models on 2026-11-22.
+            "supplements": {
+                "vanilla": "kv21/dataDistances/vsd_ca_20261122/Kv2.1_wt_vanilla_F238_R310_CA_chains.csv",
+                "masked": "kv21/dataDistances/vsd_ca_20261122/Kv2.1_wt_masked_common99_50pct_F238_R310_CA_chains.csv",
+            },
         },
         "Nav1.5": {
             "condition": "WT",
@@ -163,7 +169,29 @@ def load_paper_data(configs):
             "vanilla": pd.read_csv(config["vanilla"]),
             "masked": pd.read_csv(config["masked"]),
         }
+        for protocol, supplement in config.get("supplements", {}).items():
+            loaded[channel][protocol] = _add_missing_columns(
+                loaded[channel][protocol], data_access.resolve(supplement)
+            )
     return loaded
+
+
+def _add_missing_columns(frame, supplement_path):
+    """Add distance columns computed after the cohort table was written.
+
+    Rows are matched on the PDB file name; the retained models stay those of
+    ``frame``. Every retained model must be present in the supplement.
+    """
+    supplement = pd.read_csv(supplement_path)
+    key = supplement["pdb_file"].map(lambda value: Path(str(value)).name)
+    new_columns = [c for c in supplement.columns if c != "pdb_file" and c not in frame.columns]
+    supplement = supplement[new_columns].set_index(key)
+    models = frame["pdb_file"].map(lambda value: Path(str(value)).name)
+    absent = set(models) - set(supplement.index)
+    if absent:
+        raise KeyError(f"{len(absent)} retained models are missing from {supplement_path}")
+    added = supplement.loc[models].reset_index(drop=True)
+    return pd.concat([frame.reset_index(drop=True), added], axis=1)
 
 
 def _available_aliases(frames, aliases):
