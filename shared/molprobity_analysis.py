@@ -44,7 +44,7 @@ RANDOM_SEED = 20260930
 def _convergence_token(channel, protocol, part=None):
     """Return the staged convergence-directory token for one MolProbity cohort."""
     names = " ".join(part.get('csv_file', pd.Series(dtype=str)).astype(str)) if part is not None else ""
-    for token in ('masked_v1_50pct', 'masked_v2_50pct', 'masked_v3_50pct'):
+    for token in ('masked_common99_50pct', 'masked_v1_50pct', 'masked_v2_50pct', 'masked_v3_50pct'):
         if token in names:
             return token
     return {
@@ -88,10 +88,11 @@ def load_molprobity(channel, data_root=None):
     files = sorted(root.rglob('*.csv'))
     selected = [p for p in files if p.name.startswith(PREFIX[channel] + '_')]
     if channel == 'kv21':
-        # Only the current 50% masked cohort is part of the public analysis.
+        # Only the current 50% masked cohort is part of the public analysis:
+        # the 99-position kv21_common ensembles (masked_common99_50pct).
         active_masked = [
             p for p in selected
-            if '_masked_v3_50pct_' in p.name
+            if '_masked_common99_50pct_' in p.name
         ]
         selected = [
             p for p in selected
@@ -139,6 +140,7 @@ def load_molprobity(channel, data_root=None):
             'masked_v1_50pct': 'masked',
             'masked_v2_50pct': 'masked v2',
             'masked_v3_50pct': 'masked v3',
+            'masked_common99_50pct': 'masked',
         }.get(protocol, protocol)
         if genotype.upper() not in GENOTYPES[channel] or protocol not in PROTOCOLS:
             raise ValueError(f'Unrecognized ensemble: {run}')
