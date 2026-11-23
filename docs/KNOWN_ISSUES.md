@@ -65,3 +65,15 @@ cleanly, because only convergence-filtered vanilla distance tables are published
 raw table to recompute from; against the filtered tables they reproduce 10-13% of cells,
 below the 54% filter-only baseline. Unresolved, and not a reason to delete them.
 
+The three masked medians files were then deleted as well (HF commit `d33a0df5`, 18,319 ->
+18,316), on the grounds that the 41-column ensemble they describe is not the one the paper
+uses. The three vanilla medians remain. No masked `.gz` exists anywhere in the dataset now.
+
+Still present and still derived from the withdrawn ensembles: 15 `*_masked_*` RMSF tables
+under `data/Kv2.1/rmsf/analysis/50pct_reanalysis_2026-11-12/` (paired_rmsf, mask_classes,
+top_rmsf_changes, absolute_change_allocation and experimental_differences, one set per
+background), the clashscore and reconciliation tables under
+`data/Kv2.1/extra/conformation_analysis/50pct_reanalysis_2026-11-12/`, and
+`kv21_a3m_mask_summary.csv`, which claims 99 masked positions for ensembles that in fact
+carried 41 or 42. These have not been removed or relabelled; the decision is open.
+
