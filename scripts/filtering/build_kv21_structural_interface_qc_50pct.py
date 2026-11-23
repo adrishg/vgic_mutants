@@ -34,16 +34,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from shared import data_access  # noqa: E402
-from shared.dataset_selection import apply_kv21_interface_qc  # noqa: E402
+from shared.dataset_selection import (  # noqa: E402
+    apply_kv21_interface_qc,
+    kv21_active_masked_distance_path,
+)
 
 BASES = {
     ("WT", "vanilla"): "26-02-11_Kv2.1_wt_vanillaAF2_distances",
     ("L403A", "vanilla"): "26-02-11_Kv2.1_l403a_vanillaAF2_distances",
     ("F412L", "vanilla"): "26-02-11_Kv2.1_f412l_vanillaAF2_distances",
-    ("WT", "masked"): "26-11-12_Kv2.1_wt_masked_v3_50pct_AF2_distances",
-    ("L403A", "masked"): "26-11-12_Kv2.1_l403a_masked_v3_50pct_AF2_distances",
-    ("F412L", "masked"): "26-11-12_Kv2.1_f412l_masked_v3_50pct_AF2_distances",
 }
+# The masked bases come from the registry, so the builder follows the active
+# cohort instead of naming one.
+for _condition in ("WT", "L403A", "F412L"):
+    BASES[(_condition, "masked")] = kv21_active_masked_distance_path(
+        REPO_ROOT, _condition
+    ).stem
 
 
 def trajectory(series: pd.Series) -> pd.Series:

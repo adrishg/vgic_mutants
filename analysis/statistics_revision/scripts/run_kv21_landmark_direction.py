@@ -47,6 +47,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared import data_access  # noqa: E402
+from shared.dataset_selection import filtered_masked_distance_path  # noqa: E402
 from shared.distribution_statistics import parse_trajectory_metadata  # noqa: E402
 from shared.plotting import KV21_PALETTE  # noqa: E402
 from shared.seed_block_statistics import (  # noqa: E402
@@ -62,20 +63,22 @@ EXPERIMENTAL_DIR = ROOT / "kv21/experimental"
 # Kv2.1 model numbering = displayed numbering + 2.
 MODEL_OFFSET = 2
 
-COHORTS = {
-    ("WT", "vanilla"): "kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2_distances"
-                       "_all_ok_rmsd_3A_structural_interface_qc.csv",
-    ("WT", "masked"): "kv21/dataDistances/26-11-12_Kv2.1_wt_masked_v3_50pct_AF2_distances"
-                      "_all_ok_rmsd_3A_structural_interface_qc.csv",
-    ("L403A", "vanilla"): "kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances"
-                          "_all_ok_rmsd_3A_structural_interface_qc.csv",
-    ("L403A", "masked"): "kv21/dataDistances/26-11-12_Kv2.1_l403a_masked_v3_50pct_AF2_distances"
-                         "_all_ok_rmsd_3A_structural_interface_qc.csv",
-    ("F412L", "vanilla"): "kv21/dataDistances/26-02-11_Kv2.1_f412l_vanillaAF2_distances"
-                          "_all_ok_rmsd_3A_structural_interface_qc.csv",
-    ("F412L", "masked"): "kv21/dataDistances/26-11-12_Kv2.1_f412l_masked_v3_50pct_AF2_distances"
-                         "_all_ok_rmsd_3A_structural_interface_qc.csv",
+VANILLA_COHORTS = {
+    "WT": "kv21/dataDistances/26-02-11_Kv2.1_wt_vanillaAF2_distances"
+          "_all_ok_rmsd_3A_structural_interface_qc.csv",
+    "L403A": "kv21/dataDistances/26-02-11_Kv2.1_l403a_vanillaAF2_distances"
+             "_all_ok_rmsd_3A_structural_interface_qc.csv",
+    "F412L": "kv21/dataDistances/26-02-11_Kv2.1_f412l_vanillaAF2_distances"
+             "_all_ok_rmsd_3A_structural_interface_qc.csv",
 }
+# The masked cohort is read from the registry, never named here, so this script
+# cannot drift onto a withdrawn ensemble.
+COHORTS = {}
+for _condition, _vanilla in VANILLA_COHORTS.items():
+    COHORTS[(_condition, "vanilla")] = _vanilla
+    COHORTS[(_condition, "masked")] = str(
+        filtered_masked_distance_path(ROOT, "kv21", _condition)
+    )
 
 # F412L enters only the within-background displacement summary; the mutation-effect
 # contrast needs a mutation-matched experimental reference, which F412L does not have.

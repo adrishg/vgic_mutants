@@ -6,15 +6,15 @@ channels:
     raw_length: 600
     datasets:
       wt_masked:
-        a3m_patterns: ["Kv2.1/wt/masked_v3_50pct/*.a3m"]
+        a3m_patterns: ["Kv2.1/wt/masked_common99_50pct/*.a3m"]
         expected_count: 99
         required_ranges: "256-260, 276-280, 288-328, 370-417"
       l403a_masked:
-        a3m_patterns: ["Kv2.1/l403a/masked_v3_50pct/*.a3m"]
+        a3m_patterns: ["Kv2.1/l403a/masked_common99_50pct/*.a3m"]
         expected_count: 99
         required_ranges: "256-260, 276-280, 288-328, 370-417"
       f412l_masked:
-        a3m_patterns: ["Kv2.1/f412l/masked_v3_50pct/*.a3m"]
+        a3m_patterns: ["Kv2.1/f412l/masked_common99_50pct/*.a3m"]
         expected_count: 99
         required_ranges: "256-260, 276-280, 288-328, 370-417"
 

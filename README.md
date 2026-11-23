@@ -275,7 +275,7 @@ working tree first, then a local cache, and fetches from the dataset only when a
 ```python
 from shared.data_access import resolve
 
-frame = pd.read_csv(resolve("kv21/dataDistances/26-02-11_Kv2.1_wt_maskedAF2_distances_all.csv"))
+frame = pd.read_csv(resolve("kv21/dataDistances/26-11-20_Kv2.1_wt_masked_common99_50pct_AF2_distances.csv"))
 ```
 
 For a fully local copy, set `VGIC_DATA_ROOT` to the directory containing the downloaded dataset.

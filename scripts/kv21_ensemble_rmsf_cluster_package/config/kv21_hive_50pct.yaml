@@ -23,24 +23,24 @@ datasets:
     path: data/Kv2.1/wt/vanilla
   - name: wt_masked
     sequence_condition: wt
-    protocol: masked_v3_50pct
-    path: data/Kv2.1/wt/masked_v3_50pct
+    protocol: masked_common99_50pct
+    path: data/Kv2.1/wt/masked_common99_50pct
   - name: l403a_vanilla
     sequence_condition: l403a
     protocol: vanilla
     path: data/Kv2.1/l403a/vanilla
   - name: l403a_masked
     sequence_condition: l403a
-    protocol: masked_v3_50pct
-    path: data/Kv2.1/l403a/masked_v3_50pct
+    protocol: masked_common99_50pct
+    path: data/Kv2.1/l403a/masked_common99_50pct
   - name: f412l_vanilla
     sequence_condition: f412l
     protocol: vanilla
     path: data/Kv2.1/f412l/vanilla
   - name: f412l_masked
     sequence_condition: f412l
-    protocol: masked_v3_50pct
-    path: data/Kv2.1/f412l/masked_v3_50pct
+    protocol: masked_common99_50pct
+    path: data/Kv2.1/f412l/masked_common99_50pct
 
 references:
   anchor_id: 8SD3

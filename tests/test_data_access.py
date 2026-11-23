@@ -7,8 +7,8 @@ from shared import data_access
 
 def test_channel_paths_map_to_dataset_buckets():
     cases = {
-        "kv21/dataDistances/26-02-11_Kv2.1_wt_maskedAF2_distances_all.csv":
-            "data/Kv2.1/distances/26-02-11_Kv2.1_wt_maskedAF2_distances_all.csv",
+        "kv21/dataDistances/26-11-20_Kv2.1_wt_masked_common99_50pct_AF2_distances.csv":
+            "data/Kv2.1/distances/26-11-20_Kv2.1_wt_masked_common99_50pct_AF2_distances.csv",
         "cav12/dataRMSD/Cav12_all_models_all_references_RMSD_contacts.csv":
             "data/Cav1.2/rmsd/Cav12_all_models_all_references_RMSD_contacts.csv",
         "nav15/dataRMSF/merged/nav15_aligned_ca_coordinates.npy":
