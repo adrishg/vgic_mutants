@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import os
+import re
 import sys
 import warnings
 
@@ -22,11 +23,26 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 from shared.plotting import apply_kv21_style, KV21_PALETTE, experimental_reference_style
 from shared.data_access import resolve
-from shared.dataset_selection import kv21_active_masked_distance_path
+from shared.dataset_selection import filtered_masked_distance_path, kv21_active_masked_distance_path
 
 ROOT = REPO_ROOT
 DATA = ROOT / "kv21" / "dataExtra"
 OUT = DATA / "conformation_analysis"
+
+
+def data_file(name, *alternatives):
+    """Locate a pipeline table in the checkout, the data root, or the dataset.
+
+    ``alternatives`` are tried first, in order, and only where they already
+    exist locally; they are the laptop-sized copies of the two largest tables
+    (same rows and columns this module reads, nothing else).
+    """
+    for candidate in alternatives:
+        try:
+            return resolve(DATA / candidate)
+        except Exception:  # noqa: BLE001 - absent locally and not published
+            continue
+    return resolve(DATA / name)
 FIG = OUT / "figures"
 TAB = OUT / "tables"
 FIG.mkdir(parents=True, exist_ok=True)
@@ -102,23 +118,46 @@ def savefig(fig, name):
     plt.close(fig)
 
 def load_inputs():
-    exp = pd.read_csv(DATA/"experimental_effect_sizes.csv")
+    exp = pd.read_csv(data_file("experimental_effect_sizes.csv"))
     cols = ID_COLS + METRICS
-    chain = pd.read_csv(DATA/"kv21_l403a_conformational_metrics_chain_resolved.csv",
+    chain = pd.read_csv(data_file("kv21_l403a_conformational_metrics_chain_resolved.csv"),
                         usecols=cols, low_memory=False)
+    require_active_masked_cohort(chain)
     selected, audit = load_distance_qc_selection(chain)
     audit.to_csv(TAB/"distance_qc_join_audit.csv", index=False)
     return exp, chain, selected
 
+def require_active_masked_cohort(chain):
+    """Refuse a conformation table computed on a masked cohort that is not the registered one.
+
+    The published copy of this table predates the 50% cohorts; without this
+    check a missing local file would silently fall back to it.
+    """
+    match = re.search(r"masked_[A-Za-z0-9]+_50pct", str(kv21_active_masked_distance_path(ROOT, "WT")))
+    if match is None:
+        raise ValueError("Cannot read the active Kv2.1 masked cohort from the registry")
+    masked = chain[chain.source_type.eq("prediction") & chain.protocol.eq("masked")]
+    foreign = ~masked.source_path.astype(str).str.contains(f"/{match.group(0)}/", regex=False)
+    if masked.empty or foreign.any():
+        examples = masked.loc[foreign, "source_path"].astype(str).str.replace(r"/[^/]+$", "", regex=True).unique()[:3]
+        raise ValueError(
+            f"Conformation table is not from the active masked cohort {match.group(0)}: "
+            f"{int(foreign.sum())} of {len(masked)} masked rows come from {list(examples)}"
+        )
+
 def load_distance_qc_selection(chain):
-    """Select exact structures retained by the established distance workflow."""
+    """Select exact structures retained by the established distance workflow.
+
+    Both protocols use the final-QC table. The registry path alone is the
+    complete masked export, which would admit every recycle of every model.
+    """
     names = {
         ("wt","vanilla"): "26-02-11_Kv2.1_wt_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
-        ("wt","masked"): kv21_active_masked_distance_path(ROOT, "WT"),
+        ("wt","masked"): filtered_masked_distance_path(ROOT, "kv21", "WT"),
         ("l403a","vanilla"): "26-02-11_Kv2.1_l403a_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
-        ("l403a","masked"): kv21_active_masked_distance_path(ROOT, "L403A"),
+        ("l403a","masked"): filtered_masked_distance_path(ROOT, "kv21", "L403A"),
         ("f412l","vanilla"): "26-02-11_Kv2.1_f412l_vanillaAF2_distances_all_ok_rmsd_3A_structural_interface_qc.csv",
-        ("f412l","masked"): kv21_active_masked_distance_path(ROOT, "F412L"),
+        ("f412l","masked"): filtered_masked_distance_path(ROOT, "kv21", "F412L"),
     }
     manifest=[]; audit=[]
     unique=chain[chain.source_type.eq("prediction")][["structure_id","condition","protocol","source_path","seed","model_number","recycle"]].drop_duplicates("structure_id").copy()
@@ -229,7 +268,8 @@ def effects_from_seeds(seeds, exp_long, analysis="complete"):
 def qc_tables(chain):
     qcols=["source_type","condition","protocol","category","status","detail","structure_id","frame_orientation_score"]
     pieces=[]
-    for q in pd.read_csv(DATA/"kv21_l403a_conformational_metrics_qc.csv",usecols=qcols,chunksize=100000,low_memory=False):
+    qc_path=data_file("kv21_l403a_conformational_metrics_qc.csv","kv21_l403a_conformational_metrics_qc_compact.csv")
+    for q in pd.read_csv(qc_path,usecols=qcols,chunksize=100000,low_memory=False):
         pieces.append(q.groupby(["source_type","condition","protocol","category","status"],dropna=False).size().rename("n_records").reset_index())
     q=pd.concat(pieces).groupby(["source_type","condition","protocol","category","status"],dropna=False).n_records.sum().reset_index()
     frames=(chain[chain.source_type=="prediction"].groupby(["condition","protocol"])
@@ -244,7 +284,9 @@ def load_pi(selected_ids):
          "paper_residue","phi_deg","psi_deg","incoming_i5_O_N_distance_A","incoming_i4_O_N_distance_A",
          "incoming_i5_O_H_N_angle_deg","incoming_i4_O_H_N_angle_deg","incoming_geometric_pi_like","geometric_pi_like"]
     parts=[]
-    for x in pd.read_csv(DATA/"kv21_l403a_conformational_metrics_residue_level.csv",usecols=use,chunksize=200000,low_memory=False):
+    residue_path=data_file("kv21_l403a_conformational_metrics_residue_level.csv",
+                           "kv21_l403a_conformational_metrics_residue_level_pi_window.csv")
+    for x in pd.read_csv(residue_path,usecols=use,chunksize=200000,low_memory=False):
         parts.append(x[x.paper_residue.between(407,411) & (x.source_type.eq("experimental") | x.structure_id.isin(selected_ids))])
     d=pd.concat(parts,ignore_index=True)
     d["pi_distance_preference_A"]=d.incoming_i4_O_N_distance_A-d.incoming_i5_O_N_distance_A
@@ -344,7 +386,7 @@ def run():
              "selected_prediction_structures":int(selected.query("source_type=='prediction'").structure_id.nunique()),
              "seeds_per_condition_protocol":100,"bootstrap_replicates":N_BOOT,"primary_selection":"all_ok_rmsd_3A_structural_interface_qc",
              "pairing":"protocol-specific seed summaries; all model/recycle observations retained within seed",
-             "vanilla_exact_row_matches":22320,"masked_exact_row_matches":24000,
+             "selected_structures_by_cohort":{f"{c}_{p}":int(n) for (c,p),n in selected.query("source_type=='prediction'").groupby(["condition","protocol"]).structure_id.nunique().items()},
              "dssp":"unavailable; no DSSP claims made"}
     (TAB/"analysis_run_summary.json").write_text(json.dumps(summary,indent=2)+"\n")
     return {"effects":effects,"final":final,"complete":complete,"frame":frame,"inventory":inventory,"qc":qc,"pi_summary":pi_summary,"summary":summary}
