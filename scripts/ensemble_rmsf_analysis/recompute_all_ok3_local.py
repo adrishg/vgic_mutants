@@ -41,10 +41,14 @@ def _basename(series: pd.Series) -> pd.Series:
     return series.astype(str).map(lambda value: Path(value).name)
 
 
-def load_inputs(repo: Path, channel: str):
+def load_inputs(repo: Path, channel: str, aliases: dict[str, str] | None = None):
     root = repo / channel / "dataRMSF"
     merged = root / "merged"
     metadata = pd.read_csv(merged / f"{channel}_alignment_metadata.csv")
+    if aliases:
+        # The Hive alignment names cohorts by folder (``wt_masked_v1_50pct``);
+        # the notebooks and selection manifests use the short names.
+        metadata["dataset"] = metadata.dataset.replace(aliases)
     if len(metadata) != metadata.manifest_index.nunique():
         raise ValueError(f"{channel}: manifest_index is not unique")
     expected = np.arange(len(metadata))
@@ -73,7 +77,9 @@ def load_inputs(repo: Path, channel: str):
     return root, metadata, coordinates, present, references
 
 
-def final_selection(repo: Path, channel: str, metadata: pd.DataFrame) -> pd.DataFrame:
+def final_selection(
+    repo: Path, channel: str, metadata: pd.DataFrame, ignored: frozenset[str] = frozenset()
+) -> pd.DataFrame:
     config = CHANNEL_CONFIG[channel]
     if channel == "kv21":
         paths = sorted(
@@ -139,7 +145,7 @@ def final_selection(repo: Path, channel: str, metadata: pd.DataFrame) -> pd.Data
             raise KeyError(f"{channel}: allOK3 models absent from arrays: {missing.tolist()}")
         selected["selection_source"] = config["selection"]
     selected["manifest_index"] = selected.manifest_index.astype(int)
-    expected_datasets = set(metadata.dataset.unique())
+    expected_datasets = set(metadata.dataset.unique()) - set(ignored)
     observed_datasets = set(selected.dataset.unique())
     if expected_datasets != observed_datasets:
         raise ValueError(
@@ -392,15 +398,20 @@ def validate_against_legacy(
     return {"dataset": dataset, "max_abs_delta_A": maximum, "median_abs_delta_A": median}
 
 
-def run_channel(repo: Path, channel: str, chunk_size: int, tolerance: float):
+def run_channel(
+    repo: Path, channel: str, chunk_size: int, tolerance: float,
+    aliases: dict[str, str] | None = None, ignored: frozenset[str] = frozenset(),
+):
     config = CHANNEL_CONFIG[channel]
-    root, metadata, coordinates, present, references = load_inputs(repo, channel)
+    root, metadata, coordinates, present, references = load_inputs(repo, channel, aliases)
     profiles = root / "profiles"
     legacy = pd.read_csv(profiles / config["legacy"])
+    if aliases:
+        legacy["dataset"] = legacy.dataset.replace(aliases)
     validation = validate_against_legacy(
         channel, legacy, metadata, coordinates, present, chunk_size, tolerance
     )
-    selected = final_selection(repo, channel, metadata)
+    selected = final_selection(repo, channel, metadata, ignored)
     selected.to_csv(profiles / f"{channel}_all_ok_3_selected_models.csv", index=False)
     if channel == "kv21":
         legacy_chain = pd.read_csv(profiles / config["legacy_chain"])
@@ -442,10 +453,22 @@ def main():
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--chunk-size", type=int, default=256)
     parser.add_argument("--validation-tolerance", type=float, default=2e-4)
+    parser.add_argument(
+        "--dataset-alias", action="append", default=[], metavar="OLD=NEW",
+        help="Rename a dataset of the alignment metadata and all-model profile.",
+    )
+    parser.add_argument(
+        "--ignore-dataset", action="append", default=[],
+        help="Aligned dataset that has no rows in the selection manifest and gets no profile.",
+    )
     args = parser.parse_args()
+    aliases = dict(item.split("=", 1) for item in args.dataset_alias)
     channels = CHANNEL_CONFIG if args.channel == "all" else (args.channel,)
     for channel in channels:
-        run_channel(args.repo_root.resolve(), channel, args.chunk_size, args.validation_tolerance)
+        run_channel(
+            args.repo_root.resolve(), channel, args.chunk_size, args.validation_tolerance,
+            aliases, frozenset(args.ignore_dataset),
+        )
 
 
 if __name__ == "__main__":
