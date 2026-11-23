@@ -77,3 +77,20 @@ background), the clashscore and reconciliation tables under
 `kv21_a3m_mask_summary.csv`, which claims 99 masked positions for ensembles that in fact
 carried 41 or 42. These have not been removed or relabelled; the decision is open.
 
+## 2026-11-22: superseded Hive cohorts archived to zip and the originals deleted
+
+35 superseded masked cohorts across the three channels were zipped (Slurm job `25885704`)
+and their loose files deleted (job `25898013`). 169,265 files, 505.6 GB of source, now
+123.9 GB of `.zip` sitting beside each cohort's former location; 381.7 GB freed.
+
+Each cohort was checked three ways before deletion: entry count equal to the source,
+`unzip -t` CRC over every member, and a sha256 sample of 25 files per cohort compared
+against the extracted member (830 files, 0 mismatches). The delete job re-checked the entry
+count against the live directory immediately before removing it, and refused any active 50%
+cohort by name.
+
+Unaffected and still unzipped: the 11 active 50% cohorts (Kv2.1 `masked_common99_50pct`
+x3, Cav1.2 `masked_v3_50pct` x4, Nav1.5 `masked_v1_50pct` and `masked_v2_50pct` x4) and all
+10 vanilla cohorts. To restore an archived cohort:
+`cd /quobyte/yarovoygrp/ahgz/vgic_mutants/<channel>/<background> && unzip <cohort>.zip`.
+
