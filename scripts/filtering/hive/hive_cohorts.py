@@ -12,6 +12,10 @@ Quobyte and where its results go. Two steps, because only one of them needs the 
           tree and write their topology verdicts. One model per trajectory, not all eleven
           recycles, which is why the topology screen is the last step of the chain and not the
           first.
+  omit    every cohort in one job: the trajectories our chain rejects, written per dataset as the
+          condition,model,seed,reason CSV that Brandon's [screen] omit key reads. That is how the
+          order we settled on reaches his statistics: his screen would otherwise be the only
+          filter, and it runs before anything that needs a whole trajectory.
   sweep   every cohort in one job: the same inputs run through several filtering setups, so the
           cost of a setup can be read off one table instead of argued about. Nothing is recomputed
           between setups; they are all questions asked of the four tables the steps above wrote.
@@ -22,6 +26,7 @@ Quobyte and where its results go. Two steps, because only one of them needs the 
   python hive_cohorts.py judge --index $SLURM_ARRAY_TASK_ID
   python hive_cohorts.py chain --all
   python hive_cohorts.py sweep --all
+  python hive_cohorts.py omit --all
 """
 from __future__ import annotations
 
@@ -163,6 +168,83 @@ SETUPS = (
 )
 
 
+# cohort key -> (dataset folder, the condition name its config uses)
+FOR_CONFIG = {
+    "kv21_wt_c99": ("kv21_masked99", "WT"),
+    "kv21_l403a_c99": ("kv21_masked99", "L403A"),
+    "kv21_f412l_c99": ("kv21_masked99", "F412L"),
+    "nav15_wt_v1": ("nav15_masked_v1", "WT"),
+    "nav15_qqq_v1": ("nav15_masked_v1", "QQQ"),
+    "nav15_wt_v2": ("nav15_masked_v2", "WT"),
+    "nav15_qqq_v2": ("nav15_masked_v2", "QQQ"),
+    "cav12_wt": ("cav12_masked_v3", "WT"),
+    "cav12_g402s": ("cav12_masked_v3", "G402S"),
+    "cav12_g406r": ("cav12_masked_v3", "G406R"),
+}
+
+
+def omit_rows(cohort: dict) -> list:
+    """Every trajectory the chain rejects, with the step that rejected it.
+
+    The steps run in the settled order and each one is asked what it took, so a trajectory is named
+    for the first thing wrong with it rather than for whichever check happened to be last."""
+    dataset, condition = FOR_CONFIG[cohort["key"]]
+    chan = fc.get_channel(cohort["channel"])
+    distances = pd.read_csv(cohort["distances"], low_memory=False)
+    convergence = pd.read_csv(cohort["convergence"], low_memory=False)
+    measures = pd.read_csv(cohort["interface"]) if cohort["interface"].exists() else None
+    verdicts = pd.read_csv(cohort["topology"])
+
+    before = set(fc.trajectories(distances["pdb_file"]))
+    kept, _ = fc.apply_convergence(distances, convergence)
+    reasons = {t: "did not converge" for t in before - set(kept["trajectory"])}
+
+    def take(new, label):
+        nonlocal kept
+        for t in set(kept["trajectory"]) - set(new["trajectory"]):
+            reasons[t] = label
+        kept = new
+
+    take(fc.apply_filter_ring(kept, chan)[0], "selectivity filter ring")
+    if chan.interface_qc:
+        from shared.dataset_selection import apply_kv21_interface_qc           # noqa: PLC0415
+        take(apply_kv21_interface_qc(kept, threshold_A=fc.INTERFACE_MAX_A, trajectory_level=True),
+             "pore-VSD interface 27A")
+    if measures is not None:
+        take(fc.apply_s6_linker_qc(kept, measures, threshold_A=chan.s6_linker_max_A)[0],
+             "S6 off its own linker")
+    failed = set(verdicts.loc[~fc._truth(verdicts["topology_ok"]), "model_file"].map(
+        lambda n: fc.RECYCLE_SUFFIX.sub(".pdb", str(n))))
+    for t in set(kept["trajectory"]) & failed:
+        reasons[t] = "topology screen"
+
+    rows = []
+    for trajectory, reason in sorted(reasons.items()):
+        m = fc.MODEL_META.search(trajectory.replace(".pdb", ".r0.pdb"))
+        if m is None:
+            raise ValueError(f"{cohort['key']}: cannot read model and seed from {trajectory!r}")
+        rows.append({"dataset": dataset, "condition": condition,
+                     "model": int(m.group(1)), "seed": int(m.group(2)), "reason": reason})
+    return rows
+
+
+def omit(chosen: list) -> None:
+    """One CSV per dataset, holding every one of its conditions' rejected trajectories."""
+    rows = []
+    for cohort in chosen:
+        if cohort["key"] not in FOR_CONFIG or not cohort["topology"].exists():
+            print(f"{cohort['key']}: no chain results, skipped", flush=True)
+            continue
+        got = omit_rows(cohort)
+        print(f"{cohort['key']}: {len(got)} trajectories omitted", flush=True)
+        rows += got
+    frame = pd.DataFrame(rows)
+    for dataset, part in frame.groupby("dataset"):
+        path = OUT / f"{dataset}_omit.csv"
+        part[["condition", "model", "seed", "reason"]].to_csv(path, index=False)
+        print(f"wrote {path} ({len(part)} rows)", flush=True)
+
+
 def sweep(chosen: list) -> pd.DataFrame:
     """Every cohort through every setup, one row each, counting what each step costs.
 
@@ -210,7 +292,7 @@ def _everything_passes(verdicts):
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("mode", choices=("measure", "judge", "chain", "sweep", "list"))
+    parser.add_argument("mode", choices=("measure", "judge", "chain", "sweep", "omit", "list"))
     parser.add_argument("--index", type=int, help="array index into the cohort list")
     parser.add_argument("--cohort", action="append", help="a cohort key; repeatable")
     parser.add_argument("--all", action="store_true")
@@ -241,6 +323,10 @@ def main(argv=None) -> int:
     if args.mode == "judge":
         for cohort in chosen:
             judge(cohort)
+        return 0
+
+    if args.mode == "omit":
+        omit(chosen)
         return 0
 
     if args.mode == "sweep":

@@ -58,6 +58,7 @@ s6_on_own_s5 = true
 own_place = false
 filter_quarter = false
 first_recycle = 1
+omit = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/filter_chain/cav12_masked_v3_omit.csv"
 
 [[segments]]
 S1 = [125, 143]

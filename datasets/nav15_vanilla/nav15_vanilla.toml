@@ -51,6 +51,8 @@ s6_on_own_s5 = true
 own_place = false
 filter_quarter = false
 first_recycle = 1
+# No omit file: the filter chain has not been run on this protocol, so the
+# screen is the only filter here, unlike the masked datasets.
 
 [[segments]]
 S1 = [135, 149]

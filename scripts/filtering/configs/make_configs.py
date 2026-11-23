@@ -27,6 +27,13 @@ import numbering as nb                                                 # noqa: E
 QUOBYTE = "/quobyte/yarovoygrp/ahgz/vgic_mutants"
 ARCHIVES = f"{QUOBYTE}/analysis/archives"
 RESULTS = f"{QUOBYTE}/analysis/stats"
+CHAIN = f"{QUOBYTE}/analysis/filter_chain"
+
+# The datasets our filter chain has been run on. Their configs hand his screen an omit file, so the
+# ensemble his statistics see is the one the chain settled on rather than whatever his screen alone
+# would keep. The vanilla datasets have no chain results, so they go in with the screen only - that
+# is a difference between the two halves of this comparison and has to be said out loud.
+OMIT = {"kv21_masked99", "nav15_masked_v1", "nav15_masked_v2", "cav12_masked_v3"}
 
 FIT_SEGMENTS = ("S5", "pore_helix", "filter", "S6_upper")
 MEASURE_SEGMENTS = ("S1", "S2", "S3", "S4", "linker", "S5", "pore_helix", "filter",
@@ -187,7 +194,13 @@ def write(dataset: str, out_dir: Path) -> Path:
              's6_on_own_s5 = true',
              'own_place = false',
              'filter_quarter = false',
-             'first_recycle = 1',
+             'first_recycle = 1']
+    if dataset in OMIT:
+        body.append(f'omit = "{CHAIN}/{dataset}_omit.csv"')
+    else:
+        body.append('# No omit file: the filter chain has not been run on this protocol, so the')
+        body.append('# screen is the only filter here, unlike the masked datasets.')
+    body += [
              '',
              _segment_tables(channel),
              '']
