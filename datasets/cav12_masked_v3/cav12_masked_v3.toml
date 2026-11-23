@@ -1,0 +1,108 @@
+# cav12_masked_v3: Cav1.2, masked_v3_50pct. Written by make_configs.py - edit that, not this.
+# Ranges are UniProt (Q13936), converted from the models' own
+# numbering by filter_stats/numbering.py. The mutation names are labels: L403A is
+# UniProt 407, F412L is 416, QQQ is the IFM motif at 1485-1487.
+
+name = "cav12_masked_v3"
+uniprot_fasta = "../uniprot/Q13936.fasta"
+output_dir = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/stats/cav12_masked_v3"
+model_chains = ["A"]
+
+[reference]
+path = "../../cav12/experimental/8WE6.pdb"
+chains = ["A"]
+ignore_chains = ["C", "D"]
+
+[ranges]
+fit = [[268, 290], [350, 367], [381, 401], [647, 674], [691, 710], [730, 749], [1051, 1072], [1120, 1139], [1162, 1182], [1410, 1431], [1449, 1468], [1499, 1516]]
+measure = [[125, 143], [153, 182], [193, 217], [232, 290], [350, 367], [381, 413], [513, 542], [551, 577], [586, 608], [613, 674], [691, 710], [730, 761], [902, 919], [928, 950], [955, 975], [1011, 1033], [1036, 1049], [1051, 1072], [1120, 1139], [1162, 1194], [1227, 1256], [1264, 1322], [1372, 1408], [1410, 1431], [1449, 1468], [1499, 1528]]
+treated = [[402, 402], [406, 406]]
+
+[regions]
+vsd = [[125, 143], [153, 182], [193, 217], [232, 252], [513, 542], [551, 577], [586, 608], [613, 633], [902, 919], [928, 950], [955, 975], [1011, 1033], [1227, 1256], [1264, 1322], [1372, 1392]]
+s4s5-linker = [[253, 267], [634, 646], [1036, 1049], [1393, 1408]]
+pore = [[268, 290], [350, 367], [381, 401], [647, 674], [691, 710], [730, 749], [1051, 1072], [1120, 1139], [1162, 1182], [1410, 1431], [1449, 1468], [1499, 1516]]
+filter = [[362, 367], [706, 710], [1134, 1139], [1463, 1468]]
+gate = [[402, 413], [750, 761], [1183, 1194], [1517, 1528]]
+
+[design]
+factors = ["genotype"]
+control = "WT"
+
+[[conditions]]
+name = "WT"
+archive = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/archives/cav12_masked_v3_wt.tar.gz"
+levels = { "genotype" = "WT" }
+markers = { "402" = "G", "406" = "G" }
+
+[[conditions]]
+name = "G402S"
+archive = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/archives/cav12_masked_v3_g402s.tar.gz"
+levels = { "genotype" = "G402S" }
+markers = { "402" = "S", "406" = "G" }
+
+[[conditions]]
+name = "G406R"
+archive = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/archives/cav12_masked_v3_g406r.tar.gz"
+levels = { "genotype" = "G406R" }
+markers = { "402" = "G", "406" = "R" }
+
+[screen]
+# The checks that need no reference. own_place and filter_quarter are left off here:
+# they compare against the reference structure, and the chain we settled on judges
+# topology reference-free. first_recycle = 1 because recycle 0 is not analysed.
+domain_swapped = true
+wiring = true
+box_corners = true
+s6_on_own_s5 = true
+own_place = false
+filter_quarter = false
+first_recycle = 1
+
+[[segments]]
+S1 = [125, 143]
+S2 = [153, 182]
+S3 = [193, 217]
+S4 = [232, 252]
+linker = [253, 267]
+S5 = [268, 290]
+pore_helix = [350, 361]
+filter = [362, 367]
+S6_upper = [381, 401]
+S6_lower = [402, 413]
+
+[[segments]]
+S1 = [513, 542]
+S2 = [551, 577]
+S3 = [586, 608]
+S4 = [613, 633]
+linker = [634, 646]
+S5 = [647, 674]
+pore_helix = [691, 705]
+filter = [706, 710]
+S6_upper = [730, 749]
+S6_lower = [750, 761]
+
+[[segments]]
+S1 = [902, 919]
+S2 = [928, 950]
+S3 = [955, 975]
+S4 = [1011, 1033]
+linker = [1036, 1049]
+S5 = [1051, 1072]
+pore_helix = [1120, 1133]
+filter = [1134, 1139]
+S6_upper = [1162, 1182]
+S6_lower = [1183, 1194]
+
+[[segments]]
+S1 = [1227, 1256]
+S2 = [1264, 1301]
+S3 = [1302, 1322]
+S4 = [1372, 1392]
+linker = [1393, 1408]
+S5 = [1410, 1431]
+pore_helix = [1449, 1462]
+filter = [1463, 1468]
+S6_upper = [1499, 1516]
+S6_lower = [1517, 1528]

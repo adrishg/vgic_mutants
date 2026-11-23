@@ -1,0 +1,101 @@
+# nav15_vanilla: Nav1.5, vanilla. Written by make_configs.py - edit that, not this.
+# Ranges are UniProt (Q14524), converted from the models' own
+# numbering by filter_stats/numbering.py. The mutation names are labels: L403A is
+# UniProt 407, F412L is 416, QQQ is the IFM motif at 1485-1487.
+
+name = "nav15_vanilla"
+uniprot_fasta = "../uniprot/Q14524.fasta"
+output_dir = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/stats/nav15_vanilla"
+model_chains = ["A"]
+
+[reference]
+path = "../../nav15/experimental/7DTC.pdb"
+chains = ["A"]
+
+[ranges]
+fit = [[250, 273], [357, 376], [389, 414], [843, 869], [884, 902], [911, 936], [1331, 1357], [1404, 1423], [1453, 1470], [1653, 1679], [1696, 1715], [1744, 1771]]
+measure = [[130, 133], [135, 149], [157, 177], [191, 201], [203, 207], [218, 231], [235, 248], [250, 273], [357, 376], [389, 426], [720, 736], [744, 769], [781, 798], [808, 820], [824, 837], [843, 869], [884, 902], [911, 948], [1204, 1221], [1234, 1262], [1271, 1293], [1299, 1357], [1404, 1423], [1453, 1482], [1529, 1547], [1553, 1556], [1558, 1578], [1580, 1582], [1591, 1609], [1621, 1638], [1640, 1679], [1696, 1715], [1744, 1783]]
+treated = [[1485, 1485], [1486, 1486], [1487, 1487]]
+
+[regions]
+vsd = [[130, 133], [135, 149], [157, 177], [191, 201], [203, 207], [218, 231], [720, 736], [744, 769], [781, 798], [808, 820], [1204, 1221], [1234, 1262], [1271, 1293], [1299, 1318], [1529, 1547], [1553, 1556], [1558, 1578], [1580, 1582], [1591, 1609], [1621, 1638]]
+s4s5-linker = [[235, 248], [824, 837], [1319, 1330], [1640, 1652]]
+pore = [[250, 273], [357, 376], [389, 414], [843, 869], [884, 902], [911, 936], [1331, 1357], [1404, 1423], [1453, 1470], [1653, 1679], [1696, 1715], [1744, 1771]]
+filter = [[371, 376], [898, 902], [1419, 1423], [1710, 1715]]
+gate = [[415, 426], [937, 948], [1471, 1482], [1772, 1783]]
+
+[design]
+factors = ["genotype"]
+control = "WT"
+
+[[conditions]]
+name = "WT"
+archive = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/archives/nav15_vanilla_wt.tar.gz"
+levels = { "genotype" = "WT" }
+markers = { "1485" = "I", "1486" = "F", "1487" = "M" }
+
+[[conditions]]
+name = "QQQ"
+archive = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/archives/nav15_vanilla_qqq.tar.gz"
+levels = { "genotype" = "QQQ" }
+markers = { "1485" = "Q", "1486" = "Q", "1487" = "Q" }
+
+[screen]
+# The checks that need no reference. own_place and filter_quarter are left off here:
+# they compare against the reference structure, and the chain we settled on judges
+# topology reference-free. first_recycle = 1 because recycle 0 is not analysed.
+domain_swapped = true
+wiring = true
+box_corners = true
+s6_on_own_s5 = true
+own_place = false
+filter_quarter = false
+first_recycle = 1
+
+[[segments]]
+S1 = [135, 149]
+S2 = [157, 177]
+S3 = [191, 201]
+S4 = [218, 231]
+linker = [235, 248]
+S5 = [250, 273]
+pore_helix = [357, 370]
+filter = [371, 376]
+S6_upper = [389, 414]
+S6_lower = [415, 426]
+
+[[segments]]
+S1 = [720, 736]
+S2 = [744, 769]
+S3 = [781, 798]
+S4 = [808, 820]
+linker = [824, 837]
+S5 = [843, 869]
+pore_helix = [884, 897]
+filter = [898, 902]
+S6_upper = [911, 936]
+S6_lower = [937, 948]
+
+[[segments]]
+S1 = [1204, 1221]
+S2 = [1234, 1262]
+S3 = [1271, 1293]
+S4 = [1299, 1318]
+linker = [1319, 1330]
+S5 = [1331, 1357]
+pore_helix = [1404, 1418]
+filter = [1419, 1423]
+S6_upper = [1453, 1470]
+S6_lower = [1471, 1482]
+
+[[segments]]
+S1 = [1529, 1547]
+S2 = [1558, 1578]
+S3 = [1591, 1609]
+S4 = [1621, 1638]
+linker = [1640, 1652]
+S5 = [1653, 1679]
+pore_helix = [1696, 1709]
+filter = [1710, 1715]
+S6_upper = [1744, 1771]
+S6_lower = [1772, 1783]

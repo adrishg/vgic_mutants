@@ -1,0 +1,71 @@
+# kv21_vanilla: Kv2.1, vanilla. Written by make_configs.py - edit that, not this.
+# Ranges are UniProt (P15387), converted from the models' own
+# numbering by filter_stats/numbering.py. The mutation names are labels: L403A is
+# UniProt 407, F412L is 416, QQQ is the IFM motif at 1485-1487.
+
+name = "kv21_vanilla"
+uniprot_fasta = "../uniprot/P15387.fasta"
+output_dir = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/stats/kv21_vanilla"
+model_chains = ["A", "B", "C", "D"]
+
+[reference]
+path = "../../kv21/experimental/8SD3.pdb"
+chains = ["A", "B", "C", "D"]
+
+[ranges]
+fit = [[328, 354], [363, 382], [387, 406]]
+measure = [[185, 209], [228, 250], [255, 281], [293, 354], [363, 382], [387, 432]]
+treated = [[407, 407], [416, 416]]
+
+[regions]
+vsd = [[185, 209], [228, 250], [255, 281], [293, 313]]
+s4s5-linker = [[314, 327]]
+pore = [[328, 354], [363, 382], [387, 407]]
+filter = [[377, 382]]
+gate = [[408, 432]]
+
+[design]
+factors = ["genotype"]
+control = "WT"
+
+[[conditions]]
+name = "WT"
+archive = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/archives/kv21_vanilla_wt.tar.gz"
+levels = { "genotype" = "WT" }
+markers = { "407" = "L", "416" = "F" }
+
+[[conditions]]
+name = "L403A"
+archive = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/archives/kv21_vanilla_l403a.tar.gz"
+levels = { "genotype" = "L403A" }
+markers = { "407" = "A", "416" = "F" }
+
+[[conditions]]
+name = "F412L"
+archive = "/quobyte/yarovoygrp/ahgz/vgic_mutants/analysis/archives/kv21_vanilla_f412l.tar.gz"
+levels = { "genotype" = "F412L" }
+markers = { "407" = "L", "416" = "L" }
+
+[screen]
+# The checks that need no reference. own_place and filter_quarter are left off here:
+# they compare against the reference structure, and the chain we settled on judges
+# topology reference-free. first_recycle = 1 because recycle 0 is not analysed.
+domain_swapped = true
+wiring = true
+box_corners = true
+s6_on_own_s5 = true
+own_place = false
+filter_quarter = false
+first_recycle = 1
+
+[segments]
+S1 = [185, 209]
+S2 = [228, 250]
+S3 = [255, 281]
+S4 = [293, 313]
+linker = [314, 327]
+S5 = [328, 354]
+pore_helix = [363, 376]
+filter = [377, 382]
+S6_upper = [387, 407]
+S6_lower = [408, 432]

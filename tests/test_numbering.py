@@ -61,3 +61,20 @@ def test_every_segment_the_chain_uses_has_a_uniprot_range(channel):
     for table in channels.channel(channel).segments:
         for name, span in table.items():
             assert nb.to_uniprot_ranges(channel, span), f"{channel} {name} {span}"
+
+
+@pytest.mark.parametrize("channel", sorted(nb.BLOCKS))
+def test_segments_run_in_order_without_sharing_a_residue(channel):
+    """The screen rejects a table where one residue belongs to two segments.
+
+    Deposited HELIX records share boundaries - Cav1.2 repeat IV annotates S3 as starting where S2
+    ends, and several repeats run the filter into the pore helix - so channels.py trims them."""
+    order = ("S1", "S2", "S3", "S4", "linker", "S5", "pore_helix", "filter", "S6_upper", "S6_lower")
+    for index, table in enumerate(channels.channel(channel).segments, start=1):
+        previous = None
+        for name in order:
+            first, last = table[name]
+            assert first <= last, f"{channel} repeat {index} {name} is empty"
+            if previous is not None:
+                assert first > previous, f"{channel} repeat {index} {name} overlaps the one before"
+            previous = last

@@ -95,10 +95,24 @@ class Channel:
 
 
 def _repeat(s1, s2, s3, s4, linker, s5, pore_helix, filter_, s6_start, gate) -> dict:
-    """One repeat, with the lower S6 taken as a fixed window below the gate residue."""
-    return {"S1": s1, "S2": s2, "S3": s3, "S4": s4, "linker": linker, "S5": s5,
-            "pore_helix": pore_helix, "filter": filter_,
-            "S6_upper": (s6_start, gate), "S6_lower": (gate + 1, gate + S6_LOWER_LENGTH)}
+    """One repeat, with the lower S6 taken as a fixed window below the gate residue.
+
+    Deposited HELIX records sometimes share a boundary residue between neighbors - the filter is
+    annotated as the end of the pore helix, S3 as starting where S2 stops - so each segment is
+    trimmed to start after the one before it. A residue in two segments at once is not a
+    segmentation, and the screen rejects the table outright."""
+    table = {"S1": s1, "S2": s2, "S3": s3, "S4": s4, "linker": linker, "S5": s5,
+             "pore_helix": pore_helix, "filter": filter_,
+             "S6_upper": (s6_start, gate), "S6_lower": (gate + 1, gate + S6_LOWER_LENGTH)}
+    out, previous_end = {}, None
+    for name, (first, last) in table.items():
+        if previous_end is not None and first <= previous_end:
+            first = previous_end + 1
+        if first > last:
+            raise ValueError(f"segment {name} {table[name]} is swallowed by the one before it")
+        out[name] = (first, last)
+        previous_end = last
+    return out
 
 
 # Kv2.1: 8SD3's own HELIX records, plus 2 for the model numbering. S6 breaks at L403/P404, which is
