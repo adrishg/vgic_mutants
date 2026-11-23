@@ -43,9 +43,19 @@ def test_a_span_across_a_truncation_becomes_several_ranges():
 
 
 def test_unmapped_residues_have_no_number():
-    assert nb.to_uniprot("Nav1.5", 674) is None            # inside the repeat II truncation
     assert nb.to_uniprot("Kv2.1", 1) is None               # the construct's cloning tag
+    assert nb.to_uniprot("Kv2.1", 601) is None             # past the construct
     assert nb.to_uniprot("Cav1.2", 1) == 1                 # an exact prefix, nothing lost
+
+
+def test_nav15_maps_every_model_residue():
+    """The rat construct is loop-truncated but contiguous: the truncations are gaps in rat
+    numbering, not gaps in the model's. Against human Q14524 it looked gapped, which is what a
+    wrong reference sequence does to an alignment."""
+    unmapped = [n for n in range(1, 1573) if nb.to_uniprot("Nav1.5", n) is None]
+    assert unmapped == []
+    assert nb.to_uniprot("Nav1.5", 461) == 461             # the last residue before the first cut
+    assert nb.to_uniprot("Nav1.5", 462) == 659             # and the first after it
 
 
 @pytest.mark.parametrize("channel", sorted(nb.BLOCKS))

@@ -71,7 +71,13 @@ class Channel:
         Calibrating a cutoff means measuring the same thing on a solved structure that the check
         measures on a model, and for Nav1.5 that is not one subtraction: the construct's offset
         against 7DTC is piecewise, and within repeat II it differs either side of the filter. Taking
-        the offsets from here is what keeps the calibration and the check the same measurement."""
+        the offsets from here is what keeps the calibration and the check the same measurement.
+
+        These offsets run model -> experimental structure and are not the model -> UniProt map in
+        numbering.py. They cannot be: 7DTC is human Nav1.5 and the models are rat, so the same
+        construct residue has one number here (+196, +316) and another there (+197, +318). Both are
+        measured, neither is derived from the other, and swapping one for the other silently moves
+        every Nav1.5 segment by a residue or two."""
         if not self.experimental_offsets:
             return self.segments
         tables = self.segments if len(self.segments) > 1 else self.segments * len(self.experimental_offsets)

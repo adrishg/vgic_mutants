@@ -1,7 +1,7 @@
 # cav12_masked_v3: Cav1.2, masked_v3_50pct. Written by make_configs.py - edit that, not this.
 # Ranges are UniProt (Q13936), converted from the models' own
 # numbering by filter_stats/numbering.py. The mutation names are labels: L403A is
-# UniProt 407, F412L is 416, QQQ is the IFM motif at 1485-1487.
+# UniProt 407, F412L is 416, QQQ is the IFM motif at 1487-1489.
 
 name = "cav12_masked_v3"
 uniprot_fasta = "../uniprot/Q13936.fasta"

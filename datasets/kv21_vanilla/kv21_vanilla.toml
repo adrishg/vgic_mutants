@@ -1,7 +1,7 @@
 # kv21_vanilla: Kv2.1, vanilla. Written by make_configs.py - edit that, not this.
 # Ranges are UniProt (P15387), converted from the models' own
 # numbering by filter_stats/numbering.py. The mutation names are labels: L403A is
-# UniProt 407, F412L is 416, QQQ is the IFM motif at 1485-1487.
+# UniProt 407, F412L is 416, QQQ is the IFM motif at 1487-1489.
 
 name = "kv21_vanilla"
 uniprot_fasta = "../uniprot/P15387.fasta"

@@ -44,7 +44,7 @@ REGIONS = {"vsd": ("S1", "S2", "S3", "S4"), "s4s5-linker": ("linker",),
            "filter": ("filter",), "gate": ("S6_lower",)}
 
 REFERENCES = {"Kv2.1": ("kv21/experimental/8SD3.pdb", ["A", "B", "C", "D"], []),
-              "Nav1.5": ("nav15/experimental/7DTC.pdb", ["A"], []),
+              "Nav1.5": ("nav15/experimental/6UZ3.pdb", ["A"], []),
               "Cav1.2": ("cav12/experimental/8WE6.pdb", ["A"], ["C", "D"])}
 
 # dataset -> (channel, protocol folder, control, [(condition, markers)])
@@ -56,14 +56,14 @@ DATASETS = {
                       [("WT", {407: "L", 416: "F"}), ("L403A", {407: "A", 416: "F"}),
                        ("F412L", {407: "L", 416: "L"})]),
     "nav15_vanilla": ("Nav1.5", "vanilla", "WT",
-                      [("WT", {1485: "I", 1486: "F", 1487: "M"}),
-                       ("QQQ", {1485: "Q", 1486: "Q", 1487: "Q"})]),
+                      [("WT", {1487: "I", 1488: "F", 1489: "M"}),
+                       ("QQQ", {1487: "Q", 1488: "Q", 1489: "Q"})]),
     "nav15_masked_v1": ("Nav1.5", "masked_v1_50pct", "WT",
-                        [("WT", {1485: "I", 1486: "F", 1487: "M"}),
-                         ("QQQ", {1485: "Q", 1486: "Q", 1487: "Q"})]),
+                        [("WT", {1487: "I", 1488: "F", 1489: "M"}),
+                         ("QQQ", {1487: "Q", 1488: "Q", 1489: "Q"})]),
     "nav15_masked_v2": ("Nav1.5", "masked_v2_50pct", "WT",
-                        [("WT", {1485: "I", 1486: "F", 1487: "M"}),
-                         ("QQQ", {1485: "Q", 1486: "Q", 1487: "Q"})]),
+                        [("WT", {1487: "I", 1488: "F", 1489: "M"}),
+                         ("QQQ", {1487: "Q", 1488: "Q", 1489: "Q"})]),
     "cav12_vanilla": ("Cav1.2", "vanilla", "WT",
                       [("WT", {402: "G", 406: "G"}), ("G402S", {402: "S", 406: "G"}),
                        ("G406R", {402: "G", 406: "R"})]),
@@ -149,7 +149,7 @@ def write(dataset: str, out_dir: Path) -> Path:
     body = [f'# {dataset}: {channel}, {protocol}. Written by make_configs.py - edit that, not this.',
             f'# Ranges are UniProt ({nb.ACCESSIONS[channel]}), converted from the models\' own',
             f'# numbering by filter_stats/numbering.py. The mutation names are labels: L403A is',
-            f'# UniProt 407, F412L is 416, QQQ is the IFM motif at 1485-1487.',
+            f'# UniProt 407, F412L is 416, QQQ is the IFM motif at 1487-1489.',
             '',
             f'name = "{dataset}"',
             f'uniprot_fasta = "../uniprot/{nb.ACCESSIONS[channel]}.fasta"',

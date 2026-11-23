@@ -13,17 +13,20 @@ checked against the model files themselves, which is the only check that settles
            598 of 600 residues in a single block where human Q14721 breaks into four. The filter
            glycine the distance tables call G377 is UniProt G379, and the TVGYG motif sits at
            UniProt 375-379.
-  Nav1.5   human Q14524, piecewise. The construct is loop-truncated, so the offset is +0 at the very
-           N-terminus, -1 through repeat I, +196 through repeat II's voltage sensor, +194 from
-           repeat II's pore onward, and +316 through repeats III and IV. DEKA lands on the canonical
-           D372/E898/K1419/A1711 and the repeat II gating charges on R808/R811/R814, which is what
-           says the map is right.
+  Nav1.5   rat P15389, three blocks: +0 through model 461, +197 from 462 to 871, +318 from 872 to
+           the end. The construct is rat, not human, which is what the model files say and what the
+           prediction job names say too: they carry 6uz0, the rat cardiac channel, and 6UZ3's own
+           SEQADV records the same loop deletions from residue 462 that our block boundary falls on.
+           Against human Q14524 the same sequence breaks into twenty-four blocks and still leaves 53
+           residues mismatched; against rat it is three blocks covering all 1572 with no mismatch at
+           all. DEKA lands on D373/E901/K1421/A1713 and the IFM motif on 1487-1489, where 7FBS, the
+           rat QQQ structure, records its three engineered glutamines.
   Cav1.2   human Q13936, one block, UniProt = model. The "short" construct is an exact prefix.
 
 A third numbering exists and is not used here: the mutation names. L403A is model residue 405 and
 UniProt 407; F412L is model 414 and UniProt 416. Those names follow the classic rat drk1 numbering,
 four lower than current UniProt. Nav1.5's QQQ is the IFM inactivation motif, model 1169-1171 and
-UniProt I1485/F1486/M1487. Cav1.2's G402S and G406R are the only ones that mean what they say in
+UniProt I1487/F1488/M1489. Cav1.2's G402S and G406R are the only ones that mean what they say in
 every numbering. Read a mutation name as a label, never as a residue number.
 
 Where a construct residue falls in a gap between blocks it has no UniProt number at all, so a range
@@ -32,25 +35,20 @@ written as lists.
 """
 from __future__ import annotations
 
-ACCESSIONS = {"Kv2.1": "P15387", "Nav1.5": "Q14524", "Cav1.2": "Q13936"}
+ACCESSIONS = {"Kv2.1": "P15387", "Nav1.5": "P15389", "Cav1.2": "Q13936"}
 
 # (first model residue, last model residue, what to add to get the UniProt number)
 BLOCKS = {
     "Kv2.1": ((3, 600, +2),),
-    "Nav1.5": ((5, 35, 0), (49, 73, -1), (75, 120, -1), (122, 134, -1), (136, 202, -1),
-               (204, 286, -1), (288, 302, -1), (323, 461, -1), (462, 483, +196), (498, 512, +196),
-               (524, 546, +196), (548, 605, +196), (607, 673, +196), (677, 759, +194),
-               (761, 789, +194), (849, 862, +194), (872, 883, +316), (885, 1066, +316),
-               (1074, 1125, +316), (1137, 1240, +316), (1242, 1262, +316), (1264, 1414, +316),
-               (1426, 1495, +316), (1498, 1572, +316)),
+    "Nav1.5": ((1, 461, 0), (462, 871, +197), (872, 1572, +318)),
     "Cav1.2": ((1, 1685, 0),),
 }
 
 # Checked against the model PDBs: model number, the residue there, and the UniProt number it is.
 ANCHORS = {
     "Kv2.1": ((377, "G", 379), (405, "L", 407), (414, "F", 416)),
-    "Nav1.5": ((373, "D", 372), (704, "E", 898), (1103, "K", 1419), (1395, "A", 1711),
-               (1169, "I", 1485), (1170, "F", 1486), (1171, "M", 1487), (612, "R", 808)),
+    "Nav1.5": ((373, "D", 373), (704, "E", 901), (1103, "K", 1421), (1395, "A", 1713),
+               (1169, "I", 1487), (1170, "F", 1488), (1171, "M", 1489), (612, "R", 809)),
     "Cav1.2": ((363, "E", 363), (706, "E", 706), (1135, "E", 1135), (1464, "E", 1464),
                (402, "G", 402), (406, "G", 406)),
 }
