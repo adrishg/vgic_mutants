@@ -78,10 +78,10 @@ def test_r406_screen_is_named_as_screen_and_shown_with_conditional_contacts():
     assert set(summary.partner_residue) == {"screen_only", "ASP1528", "ASP1533"}
     assert set(summary.atom_selection_rule) == {"side_chain_non_hydrogen_atoms"}
     screen = summary[summary.partner_residue.eq("screen_only")].set_index("protocol")
-    assert screen.loc["vanilla", "unconditional_pass_fraction"] == pytest.approx(3371 / 5000)
-    assert screen.loc["masked", "unconditional_pass_fraction"] == pytest.approx(576 / 4998)
+    assert screen.loc["vanilla", "unconditional_pass_fraction"] == pytest.approx(2423 / 5000)
+    assert screen.loc["masked", "unconditional_pass_fraction"] == pytest.approx(514 / 4998)
     contacts = summary[summary.partner_residue.eq("ASP1528")].set_index("protocol")
-    assert contacts.loc["vanilla", "conditional_contact_denominator"] == 3371
+    assert contacts.loc["vanilla", "conditional_contact_denominator"] == 2423
     assert "does not validate the entire pocket" in " ".join(
         text.get_text() for text in figure.texts
     )

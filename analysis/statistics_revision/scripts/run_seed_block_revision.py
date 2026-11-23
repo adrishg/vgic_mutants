@@ -108,6 +108,13 @@ def read_csv(path: Path, **kwargs) -> pd.DataFrame:
             frame = frame.merge(
                 extra.drop(columns=overlap), on="pdb_file", how="left", validate="one_to_one"
             )
+
+    # Nav1.5 IFM and Cav1.2 R406 contacts: one atom definition in both
+    # protocols (see shared/side_chain_supplements.py).
+    from shared.side_chain_supplements import apply_side_chain_supplement
+    frame = apply_side_chain_supplement(
+        frame, selected.name, add_missing="usecols" not in kwargs
+    )
     return frame
 
 

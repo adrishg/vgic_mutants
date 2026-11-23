@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Manuscript Fig. 7C/7D panels for the 50% Cav1.2 Timothy-syndrome ensembles.
 
-7C: shortest heavy-atom distance from R406 to T1531, D1533, D1528 and F1527 in
-    G406R vanilla (left half) and masked (right half) ensembles.
+7C: shortest side-chain non-hydrogen distance from R406 to T1531, D1533, D1528
+    and F1527 in G406R vanilla (left half) and masked (right half) ensembles.
+    Both protocols use the side-chain tables of 2026-11-23
+    (``shared/side_chain_supplements.py``); the original vanilla export used
+    terminal atoms only and the masked export every non-hydrogen atom.
 7D: S402 Cα distance to I1523, V1520, M1524 and D1528 in G402S vanilla and
     masked ensembles (Cα, because glycine has no side chain to compare).
 
 Inputs are the All-OK-3 filtered tables (vanilla 2026 exports and the
 registered 50% masked cohorts). WT experimental markers (8WE6, 8HLP, 8FD7) come
-from ``cav12_experimental_shortest_distances``; for G406 they are WT glycine
-all-heavy-atom minima, i.e. structural baselines rather than arginine contacts.
+from ``cav12_experimental_shortest_distances`` and are drawn in 7D only: the
+experimental structures carry glycine at 406, which has no side-chain atom.
 Outputs: ``cav12/dataDistances/analysis/figures/fig7{c,d}_*.{png,pdf}`` and the
 plotted values in ``cav12/dataDistances/analysis/tables/``.
 """
@@ -33,6 +36,7 @@ from shared import data_access  # noqa: E402
 from shared.dataset_selection import filtered_masked_distance_path  # noqa: E402
 from shared.mutation_contact_analysis import cav12_experimental_shortest_distances  # noqa: E402
 from shared.plotting import CAV12_PALETTE, experimental_reference_style  # noqa: E402
+from shared.side_chain_supplements import apply_side_chain_supplement  # noqa: E402
 
 VANILLA = {
     "G406R": "cav12/dataDistances/26-07-25_Cav1.2_g406r_vanillaAF2_distances_all_ok_rmsd_3A.csv",
@@ -43,14 +47,15 @@ PANELS = {
         site=406, residue="ARG406", label="R406",
         partners=["THR1531", "ASP1533", "ASP1528", "PHE1527"],
         column="shortest_ARG406-{partner}", exp_column="Shortest distance (Å)",
-        ylabel="Shortest heavy-atom distance (Å)", stem="fig7c_g406r_r406_shortest_distances",
+        ylabel="Shortest side-chain heavy-atom distance (Å)",
+        stem="fig7c_g406r_r406_shortest_distances", experimental=False,
         guides=((4.0, "--", "4 Å proximity guide"), (2.0, ":", "2 Å overlap flag")),
     ),
     "G402S": dict(
         site=402, residue="SER402", label="S402",
         partners=["ILE1523", "VAL1520", "MET1524", "ASP1528"],
         column="CA_SER402_CA-{partner}_CA", exp_column="Cα distance (Å)",
-        ylabel="Cα distance (Å)", stem="fig7d_g402s_s402_ca_distances",
+        ylabel="Cα distance (Å)", stem="fig7d_g402s_s402_ca_distances", experimental=True,
         guides=(),
     ),
 }
@@ -63,16 +68,17 @@ def short(partner: str) -> str:
 
 def load(mutant: str, protocol: str) -> pd.DataFrame:
     if protocol == "vanilla":
-        path = data_access.resolve(VANILLA[mutant])
+        requested = VANILLA[mutant]
     else:
-        path = data_access.resolve(filtered_masked_distance_path(ROOT, "cav12", mutant))
+        requested = filtered_masked_distance_path(ROOT, "cav12", mutant)
+    path = data_access.resolve(requested)
     frame = pd.read_csv(path, low_memory=False)
     extra = Path(str(path).replace("_all_ok_rmsd_3A", "_extra_all_ok_rmsd_3A"))
     if extra.is_file():
         companion = pd.read_csv(extra, low_memory=False)
         companion = companion[[c for c in companion if c == "pdb_file" or c not in frame]]
         frame = frame.merge(companion, on="pdb_file", how="left")
-    return frame
+    return apply_side_chain_supplement(frame, Path(str(requested)).name)
 
 
 def build(mutant: str, spec: dict) -> pd.DataFrame:
@@ -86,8 +92,11 @@ def build(mutant: str, spec: dict) -> pd.DataFrame:
                 "Distance (Å)": values.to_numpy(),
             }))
     table = pd.concat(rows, ignore_index=True)
-    experimental = cav12_experimental_shortest_distances(ROOT, spec["site"], spec["partners"])
-    experimental["Partner"] = experimental["Partner"].map(short)
+    if spec["experimental"]:
+        experimental = cav12_experimental_shortest_distances(ROOT, spec["site"], spec["partners"])
+        experimental["Partner"] = experimental["Partner"].map(short)
+    else:
+        experimental = pd.DataFrame(columns=["Structure", "Partner", spec["exp_column"]])
     order = [short(p) for p in spec["partners"]]
     colors = {"vanilla": CAV12_PALETTE[f"{mutant}_VAN"], "masked": CAV12_PALETTE[f"{mutant}_HM"]}
 
