@@ -34,6 +34,15 @@ measured in 26-11/filterComparison/FILTER_ORDER_FINDINGS.md section 9, neither o
 
 The topology screen judges only the representative, not all eleven recycles. That is about eleven
 times cheaper, but the reason is that the representative is the unit the rest of the analysis reports.
+It judges recycle 0 too: the convergence step picks r0 as the representative for over half of some
+cohorts, so a screen that skipped it would let exactly those models through unjudged.
+
+Steps 2 and 3 are absolute thresholds applied per model and then taken to the trajectory, so none of
+them is a statistic over the set another has thinned and their order among themselves changes no
+survivor and no count - only which name a doomed trajectory is filed under in chain_verdicts(). The
+convention is the generalized S6-linker check before the Kv2.1-only published one, so that one
+structural failure carries one name in all three channels. docs/FILTER_CHAIN_ORDER.md has the whole
+argument and the numbers behind it.
 
 Only the published form is a cutoff anyone has published. The generalized form was calibrated on
 fourteen experimental structures (channels.py, item 3) and is the only one Nav1.5 and Cav1.2 can
@@ -377,6 +386,174 @@ def apply_topology(representatives: pd.DataFrame, *, chan: Channel = None, model
     return kept, verdicts, {"representatives_in": len(representatives),
                             "representatives_out": len(kept),
                             "could_not_judge": int((verdicts["error"].astype(str) != "").sum())}
+
+
+# =========================================================================== the per-prediction verdict table
+
+# The chain's steps in the order they run, each with the sentence a reader who has never seen this
+# code should be able to act on. The keys are the `removed_by` values in the verdict table.
+FILTER_STEPS = (
+    ("convergence",
+     "No recycle of this prediction reached the all-OK-3 convergence criterion, so the trajectory "
+     "never settled."),
+    ("selectivity_filter_ring",
+     "The selectivity-filter ring opened past the cutoff in at least one retained recycle."),
+    ("pore_vsd_interface_s6_linker",
+     "The lower S6 let go of its own S4-S5 linker in at least one retained recycle, so the gate is "
+     "no longer held by the joint it hangs from."),
+    ("pore_vsd_interface_published",
+     "The published Kv2.1 pore-VSD interface opened past the cutoff in at least one retained "
+     "recycle. This check exists for Kv2.1 only."),
+    ("topology",
+     "The representative model failed at least one reference-free topology check."),
+)
+STEP_REASON = dict(FILTER_STEPS)
+
+PASS, FAIL, NOT_APPLICABLE = "pass", "fail", "not_applicable"
+
+
+def _per_trajectory_max(frame: pd.DataFrame, columns: list) -> dict:
+    """The widest of `columns` over each trajectory's rows, as {trajectory: value}."""
+    if not len(frame):
+        return {}
+    widest = frame[columns].apply(pd.to_numeric, errors="coerce").max(axis=1)
+    return widest.groupby(frame["trajectory"]).max().to_dict()
+
+
+def _published_interface_columns() -> list:
+    """The 24 columns the published Kv2.1 pore-VSD check reads, in shared/dataset_selection.py."""
+    return [f"CA_CA_{chain}_{first}_CA-{chain}_{second}_CA"
+            for chain in "ABCD"
+            for first in ("LYS429", "GLU425", "LYS422")
+            for second in ("ASN181", "VAL184")]
+
+
+def chain_verdicts(distances: pd.DataFrame, convergence: pd.DataFrame, *, channel: str,
+                   topology_verdicts: pd.DataFrame, interface_measures=None,
+                   dataset: str = "", condition: str = "",
+                   ring_threshold_A: float = None, interface_threshold_A: float = INTERFACE_MAX_A,
+                   s6_linker_threshold_A: float = None) -> pd.DataFrame:
+    """One row per prediction: what every step measured, whether it passed, and if not, which step
+    took it and why.
+
+    This is the table a reader outside the project gets. `run_chain` answers "what survives"; this
+    answers "what happened to each prediction", which is the same walk through the same steps in
+    the same order, with nothing discarded along the way.
+
+    A prediction here is one (model, seed) trajectory - the eleven recycles of one ColabFold
+    prediction - because every step but the topology screen judges the trajectory as a whole.
+
+    Measurements are taken over each trajectory's retained recycles, which is the set the filters
+    themselves see. A trajectory that never converged has no retained recycles, so its later
+    measurements are blank rather than zero."""
+    chan = get_channel(channel)
+    distances = distances.copy()
+    distances.attrs["dataset_label"] = f"{dataset} {condition}".strip() or chan.name
+
+    all_trajectories = sorted(set(trajectories(distances["pdb_file"])))
+    recycles_in = trajectories(distances["pdb_file"]).value_counts().to_dict()
+
+    kept, _ = apply_convergence(distances, convergence)
+    converged = set(kept["trajectory"])
+    retained_counts = kept["trajectory"].value_counts().to_dict()
+    representative = (kept.loc[kept["is_representative"]]
+                      .set_index("trajectory")["model_file"].to_dict())
+
+    reasons, status_step = {}, {}
+    for trajectory in set(all_trajectories) - converged:
+        status_step[trajectory] = "convergence"
+
+    ring_max = _per_trajectory_max(kept, filter_ring_columns(kept, chan))
+    published_columns = _published_interface_columns()
+    has_published = chan.interface_qc and all(c in kept.columns for c in published_columns)
+    published_max = _per_trajectory_max(kept, published_columns) if has_published else {}
+    if interface_measures is not None:
+        by_model = interface_measures.set_index("pdb_file")["s6_linker_max_A"].to_dict()
+        s6_values = kept["model_file"].map(by_model)
+        s6_max = s6_values.groupby(kept["trajectory"]).max().to_dict()
+    else:
+        s6_max = {}
+
+    def take(new, step):
+        nonlocal kept
+        for trajectory in set(kept["trajectory"]) - set(new["trajectory"]):
+            status_step[trajectory] = step
+        kept = new
+
+    take(apply_filter_ring(kept, chan, threshold_A=ring_threshold_A)[0], "selectivity_filter_ring")
+    if interface_measures is not None:
+        threshold = chan.s6_linker_max_A if s6_linker_threshold_A is None else s6_linker_threshold_A
+        take(apply_s6_linker_qc(kept, interface_measures, threshold_A=threshold)[0],
+             "pore_vsd_interface_s6_linker")
+    if chan.interface_qc:
+        take(apply_kv21_interface_qc(kept, threshold_A=interface_threshold_A, trajectory_level=True),
+             "pore_vsd_interface_published")
+
+    verdicts = topology_verdicts.copy()
+    key = "model_file" if "model_file" in verdicts.columns else "pdb_file"
+    verdicts["model_file"] = basenames(verdicts[key])
+    topology_ok = dict(zip(verdicts["model_file"], _truth(verdicts["topology_ok"])))
+    check_ok = {c: dict(zip(verdicts["model_file"], _truth(verdicts[f"{c}_ok"])))
+                for c in TOPOLOGY_CHECKS if f"{c}_ok" in verdicts.columns}
+    unjudged = sorted(n for t, n in representative.items() if t in set(kept["trajectory"])
+                      and n not in topology_ok)
+    if unjudged:
+        raise KeyError(f"{len(unjudged)} representative(s) reach the topology step with no verdict, for "
+                       f"example {unjudged[:3]}; re-run the judge step over this cohort")
+    for trajectory in sorted(set(kept["trajectory"])):
+        name = representative.get(trajectory)
+        if name is not None and not topology_ok.get(name, False):
+            status_step[trajectory] = "topology"
+
+    ring_threshold = chan.ring_max_A if ring_threshold_A is None else ring_threshold_A
+    s6_threshold = chan.s6_linker_max_A if s6_linker_threshold_A is None else s6_linker_threshold_A
+
+    def verdict(value, threshold, ran):
+        if not ran or value is None or not np.isfinite(value):
+            return NOT_APPLICABLE
+        return PASS if value <= threshold else FAIL
+
+    rows = []
+    for trajectory in all_trajectories:
+        meta = MODEL_META.search(trajectory.replace(".pdb", ".r0.pdb"))
+        name = representative.get(trajectory)
+        rep_meta = MODEL_META.search(name) if name else None
+        step = status_step.get(trajectory)
+        ring = ring_max.get(trajectory, float("nan"))
+        s6 = s6_max.get(trajectory, float("nan"))
+        pub = published_max.get(trajectory, float("nan"))
+        rows.append({
+            "dataset": dataset,
+            "condition": condition,
+            "channel": chan.name,
+            "prediction": trajectory,
+            "model": int(meta.group(1)) if meta else np.nan,
+            "seed": int(meta.group(2)) if meta else np.nan,
+            "recycles_in_distance_table": int(recycles_in.get(trajectory, 0)),
+            "recycles_retained_after_convergence": int(retained_counts.get(trajectory, 0)),
+            "representative_model_file": name or "",
+            "representative_recycle": int(rep_meta.group(3)) if rep_meta else np.nan,
+            "convergence_result": PASS if trajectory in converged else FAIL,
+            "selectivity_filter_ring_max_A": ring,
+            "selectivity_filter_ring_cutoff_A": float(ring_threshold),
+            "selectivity_filter_ring_result": verdict(ring, ring_threshold, trajectory in converged),
+            "pore_vsd_s6_linker_max_A": s6,
+            "pore_vsd_s6_linker_cutoff_A": float(s6_threshold) if s6_max else np.nan,
+            "pore_vsd_s6_linker_result": verdict(s6, s6_threshold, bool(s6_max)),
+            "pore_vsd_published_max_A": pub,
+            "pore_vsd_published_cutoff_A": float(interface_threshold_A) if has_published else np.nan,
+            "pore_vsd_published_result": verdict(pub, interface_threshold_A, has_published),
+            **{f"topology_{c}_result": (PASS if check_ok[c].get(name, False) else FAIL)
+               if (name and name in check_ok[c]) else NOT_APPLICABLE
+               for c in check_ok},
+            "topology_result": (PASS if topology_ok.get(name, False) else FAIL)
+                               if (name and name in topology_ok) else NOT_APPLICABLE,
+            "status": "removed" if step else "passed",
+            "removed_by": step or "",
+            "removed_because": STEP_REASON[step] if step else "",
+        })
+    out = pd.DataFrame(rows)
+    return out.sort_values(["model", "seed"], kind="stable").reset_index(drop=True)
 
 
 # =========================================================================== the chain

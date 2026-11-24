@@ -19,6 +19,10 @@ Quobyte and where its results go. Two steps, because only one of them needs the 
   sweep   every cohort in one job: the same inputs run through several filtering setups, so the
           cost of a setup can be read off one table instead of argued about. Nothing is recomputed
           between setups; they are all questions asked of the four tables the steps above wrote.
+  verdicts every cohort in one job: the per-prediction pass/fail table, one CSV per dataset,
+          holding every prediction with what each step measured and which step removed it. This is
+          the deliverable someone outside the project reads; `omit` is the same walk written for
+          Brandon's [screen] omit key.
   chain   every cohort in one job: convergence, filter ring, interface QC (Kv2.1 only) and then
           those verdicts, writing <cohort>_chain_qc.csv and a .json of the per-step counts.
 
@@ -27,6 +31,7 @@ Quobyte and where its results go. Two steps, because only one of them needs the 
   python hive_cohorts.py chain --all
   python hive_cohorts.py sweep --all
   python hive_cohorts.py omit --all
+  python hive_cohorts.py verdicts --all
 """
 from __future__ import annotations
 
@@ -70,6 +75,14 @@ COHORTS = [
             "Kv2.1/dataDistances/26-11-20_Kv2.1_f412l_masked_common99_50pct_AF2_distances.csv",
             "Kv2.1/rmsd_convergence_filtering/Kv21_rmsd_convergence_f412l_masked_common99_50pct/all_ok_models.csv",
             "Kv2.1/f412l/masked_common99_50pct/models"),
+    _cohort("nav15_wt_vanilla", "Nav1.5",
+            "Nav1.5/dataDistances/26-07-27_Nav15_wt_vanillaAF2_distances_all_all.csv",
+            "Nav1.5/rmsd_convergence_filtering/Nav15_rmsd_convergence_wt_vanilla/all_ok_models.csv",
+            "Nav1.5/wt/vanilla"),
+    _cohort("nav15_qqq_vanilla", "Nav1.5",
+            "Nav1.5/dataDistances/26-07-27_Nav15_qqq_vanilla_AF2_distances_all_all.csv",
+            "Nav1.5/rmsd_convergence_filtering/Nav15_rmsd_convergence_qqq_vanilla/all_ok_models.csv",
+            "Nav1.5/qqq/vanilla"),
     _cohort("nav15_wt_v1", "Nav1.5",
             "Nav1.5/dataDistances/26-11-10_Nav15_wt_masked_v1_50pct_AF2_distances.csv",
             "Nav1.5/Nav15_rmsd_convergence_wt_masked_v1_50pct/all_ok_models.csv",
@@ -173,6 +186,8 @@ FOR_CONFIG = {
     "kv21_wt_c99": ("kv21_masked99", "WT"),
     "kv21_l403a_c99": ("kv21_masked99", "L403A"),
     "kv21_f412l_c99": ("kv21_masked99", "F412L"),
+    "nav15_wt_vanilla": ("nav15_vanilla", "WT"),
+    "nav15_qqq_vanilla": ("nav15_vanilla", "QQQ"),
     "nav15_wt_v1": ("nav15_masked_v1", "WT"),
     "nav15_qqq_v1": ("nav15_masked_v1", "QQQ"),
     "nav15_wt_v2": ("nav15_masked_v2", "WT"),
@@ -206,13 +221,13 @@ def omit_rows(cohort: dict) -> list:
         kept = new
 
     take(fc.apply_filter_ring(kept, chan)[0], "selectivity filter ring")
+    if measures is not None:
+        take(fc.apply_s6_linker_qc(kept, measures, threshold_A=chan.s6_linker_max_A)[0],
+             "S6 off its own linker")
     if chan.interface_qc:
         from shared.dataset_selection import apply_kv21_interface_qc           # noqa: PLC0415
         take(apply_kv21_interface_qc(kept, threshold_A=fc.INTERFACE_MAX_A, trajectory_level=True),
              "pore-VSD interface 27A")
-    if measures is not None:
-        take(fc.apply_s6_linker_qc(kept, measures, threshold_A=chan.s6_linker_max_A)[0],
-             "S6 off its own linker")
     failed = set(verdicts.loc[~fc._truth(verdicts["topology_ok"]), "model_file"].map(
         lambda n: fc.RECYCLE_SUFFIX.sub(".pdb", str(n))))
     for t in set(kept["trajectory"]) & failed:
@@ -285,6 +300,44 @@ def sweep(chosen: list) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def verdict_rows(cohort: dict) -> pd.DataFrame:
+    """The cohort's per-prediction verdict table: what each step measured and what took each loss."""
+    dataset, condition = FOR_CONFIG[cohort["key"]]
+    measures = pd.read_csv(cohort["interface"]) if cohort["interface"].exists() else None
+    return fc.chain_verdicts(pd.read_csv(cohort["distances"], low_memory=False),
+                             pd.read_csv(cohort["convergence"], low_memory=False),
+                             channel=cohort["channel"],
+                             topology_verdicts=pd.read_csv(cohort["topology"]),
+                             interface_measures=measures,
+                             dataset=dataset, condition=condition)
+
+
+def verdicts(chosen: list, out_dir: Path = None) -> None:
+    """One CSV per dataset, every prediction of every condition in it, passed and removed alike.
+
+    This is the file someone outside the project reads, so it is written per dataset rather than
+    per cohort: a dataset is the unit a protocol is compared in, and its conditions belong in one
+    table."""
+    out_dir = OUT if out_dir is None else out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    per_dataset = {}
+    for cohort in chosen:
+        if cohort["key"] not in FOR_CONFIG or not cohort["topology"].exists():
+            print(f"{cohort['key']}: no topology verdicts, skipped", flush=True)
+            continue
+        frame = verdict_rows(cohort)
+        passed = int((frame["status"] == "passed").sum())
+        print(f"{cohort['key']}: {passed}/{len(frame)} predictions pass "
+              f"({frame['removed_by'].replace('', 'passed').value_counts().to_dict()})", flush=True)
+        per_dataset.setdefault(FOR_CONFIG[cohort["key"]][0], []).append(frame)
+    for dataset, frames in sorted(per_dataset.items()):
+        table = pd.concat(frames, ignore_index=True)
+        path = out_dir / f"{dataset}_filter_verdicts.csv"
+        table.to_csv(path, index=False)
+        print(f"wrote {path} ({len(table)} predictions, "
+              f"{int((table['status'] == 'passed').sum())} passed)", flush=True)
+
+
 def _everything_passes(verdicts):
     """The verdict table with every model passing, which is how a setup leaves the screen out."""
     if verdicts is None:
@@ -296,10 +349,11 @@ def _everything_passes(verdicts):
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("mode", choices=("measure", "judge", "chain", "sweep", "omit", "list"))
+    parser.add_argument("mode", choices=("measure", "judge", "chain", "sweep", "omit", "verdicts", "list"))
     parser.add_argument("--index", type=int, help="array index into the cohort list")
     parser.add_argument("--cohort", action="append", help="a cohort key; repeatable")
     parser.add_argument("--all", action="store_true")
+    parser.add_argument("--out", help="verdicts only: write the per-dataset CSVs here instead")
     args = parser.parse_args(argv)
 
     if args.mode == "list":
@@ -331,6 +385,10 @@ def main(argv=None) -> int:
 
     if args.mode == "omit":
         omit(chosen)
+        return 0
+
+    if args.mode == "verdicts":
+        verdicts(chosen, Path(args.out) if args.out else None)
         return 0
 
     if args.mode == "sweep":
