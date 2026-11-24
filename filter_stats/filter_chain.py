@@ -451,7 +451,10 @@ def chain_verdicts(distances: pd.DataFrame, convergence: pd.DataFrame, *, channe
     distances.attrs["dataset_label"] = f"{dataset} {condition}".strip() or chan.name
 
     all_trajectories = sorted(set(trajectories(distances["pdb_file"])))
-    recycles_in = trajectories(distances["pdb_file"]).value_counts().to_dict()
+    # A cohort's distance table also holds the final structure ColabFold writes without a .rN
+    # suffix, so count the recycles themselves rather than every row of the trajectory.
+    is_recycle = basenames(distances["pdb_file"]).str.contains(RECYCLE_SUFFIX)
+    recycles_in = trajectories(distances.loc[is_recycle, "pdb_file"]).value_counts().to_dict()
 
     kept, _ = apply_convergence(distances, convergence)
     converged = set(kept["trajectory"])

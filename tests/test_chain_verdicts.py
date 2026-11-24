@@ -141,3 +141,16 @@ def test_a_representative_with_no_verdict_stops_the_run():
     short = _topology().iloc[:2]
     with pytest.raises(KeyError, match="no verdict"):
         _run(topology=short)
+
+
+def test_the_final_structure_without_a_recycle_suffix_is_not_counted_as_a_recycle():
+    """ColabFold writes each prediction's final structure again with no .rN suffix, and the cohort
+    distance tables carry it. Counting it would report twelve recycles where there are eleven."""
+    cohort = _cohort()
+    final = cohort.iloc[[0]].copy()
+    final["pdb_file"] = "out/model_1_seed_1.pdb"
+    table = fc.chain_verdicts(pd.concat([cohort, final], ignore_index=True), _convergence(),
+                              channel="Kv2.1", topology_verdicts=_topology(),
+                              interface_measures=_measures(), dataset="demo", condition="WT")
+    assert set(table["recycles_in_distance_table"]) == {2}
+    assert len(table) == len(SEEDS)

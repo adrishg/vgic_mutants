@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=12G
-#SBATCH --array=0-9%5
+#SBATCH --array=0-11%5
 #SBATCH --output=/quobyte/yarovoygrp/ahgz/vgic_mutants/scripts/filter_chain/logs/judge-%A_%a.out
 #SBATCH --error=/quobyte/yarovoygrp/ahgz/vgic_mutants/scripts/filter_chain/logs/judge-%A_%a.err
 # One array task per cohort: judge that cohort's convergence representatives with the topology

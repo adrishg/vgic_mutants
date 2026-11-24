@@ -75,14 +75,6 @@ COHORTS = [
             "Kv2.1/dataDistances/26-11-20_Kv2.1_f412l_masked_common99_50pct_AF2_distances.csv",
             "Kv2.1/rmsd_convergence_filtering/Kv21_rmsd_convergence_f412l_masked_common99_50pct/all_ok_models.csv",
             "Kv2.1/f412l/masked_common99_50pct/models"),
-    _cohort("nav15_wt_vanilla", "Nav1.5",
-            "Nav1.5/dataDistances/26-07-27_Nav15_wt_vanillaAF2_distances_all_all.csv",
-            "Nav1.5/rmsd_convergence_filtering/Nav15_rmsd_convergence_wt_vanilla/all_ok_models.csv",
-            "Nav1.5/wt/vanilla"),
-    _cohort("nav15_qqq_vanilla", "Nav1.5",
-            "Nav1.5/dataDistances/26-07-27_Nav15_qqq_vanilla_AF2_distances_all_all.csv",
-            "Nav1.5/rmsd_convergence_filtering/Nav15_rmsd_convergence_qqq_vanilla/all_ok_models.csv",
-            "Nav1.5/qqq/vanilla"),
     _cohort("nav15_wt_v1", "Nav1.5",
             "Nav1.5/dataDistances/26-11-10_Nav15_wt_masked_v1_50pct_AF2_distances.csv",
             "Nav1.5/Nav15_rmsd_convergence_wt_masked_v1_50pct/all_ok_models.csv",
@@ -111,6 +103,17 @@ COHORTS = [
             "Cav1.2/dataDistances/26-11-10_Cav12_g406r_masked_v3_50pct_AF2_distances.csv",
             "Cav1.2/Cav12_rmsd_convergence_g406r_masked_v3_50pct/all_ok_models.csv",
             "Cav1.2/g406r/masked_v3_50pct/models"),
+    # The two Nav1.5 vanilla cohorts are appended rather than filed with the other Nav1.5 entries
+    # so that the array indices of the first ten, which earlier jobs and their logs refer to, do
+    # not move. Their models sit in the ColabFold output folder itself, not in a models/ subfolder.
+    _cohort("nav15_wt_vanilla", "Nav1.5",
+            "Nav1.5/dataDistances/26-07-27_Nav15_wt_vanillaAF2_distances_all_all.csv",
+            "Nav1.5/rmsd_convergence_filtering/Nav15_rmsd_convergence_wt_vanilla/all_ok_models.csv",
+            "Nav1.5/wt/vanilla"),
+    _cohort("nav15_qqq_vanilla", "Nav1.5",
+            "Nav1.5/dataDistances/26-07-27_Nav15_qqq_vanilla_AF2_distances_all_all.csv",
+            "Nav1.5/rmsd_convergence_filtering/Nav15_rmsd_convergence_qqq_vanilla/all_ok_models.csv",
+            "Nav1.5/qqq/vanilla"),
 ]
 BY_KEY = {c["key"]: c for c in COHORTS}
 
