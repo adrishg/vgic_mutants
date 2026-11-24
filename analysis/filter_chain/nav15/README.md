@@ -106,6 +106,13 @@ filter that cleaned anything. The pore–VSD measure sits inside the experimenta
 whole set. Say what the filters did not reject as plainly as what they did; a check that removes
 nothing on this data is a check with no discrimination here, not evidence of a clean ensemble.
 
+## What changed since the set sent in November
+
+`WHAT_CHANGED_SINCE_NOVEMBER.md` beside this file, with per-model tables
+(`nav15_masked_v1_old_vs_new.csv`, `nav15_masked_v2_old_vs_new.csv`,
+`nav15_old_vs_new_summary.csv`). In one line: of the four masked cohorts sent in November, three are
+identical model for model and the fourth lost exactly one model. The vanilla arm was never sent.
+
 ## Where the models themselves are
 
 See `MODEL_BUNDLES.md` beside this file.
