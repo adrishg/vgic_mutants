@@ -191,7 +191,8 @@ def check_step1_columns(dv: pd.DataFrame, X: np.ndarray, sites: pd.DataFrame, fr
 def read_screen(conf: Config, step1: dict) -> dict:
     """The screen's verdicts, after checking they are up to date: made by the current screen.py, with this
     config's [screen] and [segments] and the same omit file, from these step 1 files, and covering exactly
-    step 1's models after recycle 0. Returns {"kept": set of (condition, model, seed, recycle), "removed": n,
+    step 1's models at [screen] first_recycle and above. Returns {"kept": set of (condition, model, seed,
+    recycle), "first_recycle": the lowest recycle judged, "removed": n,
     "screened": n, "reference": the screen's reference, "manifest_sha256"}."""
     folder = Path(conf.output_dir) / "screen"
     man_path, verdicts_path = folder / "manifest.json", folder / "verdicts.csv"
@@ -224,22 +225,26 @@ def read_screen(conf: Config, step1: dict) -> dict:
     v = pd.read_csv(verdicts_path, dtype={"condition": str}, keep_default_na=False)
     keys = list(zip(v.condition, v.model, v.seed, v.recycle))
     dv = step1["dv"]
-    after0 = dv.recycle >= 1
-    if sorted(keys) != sorted(zip(dv.condition[after0], dv.model[after0], dv.seed[after0], dv.recycle[after0])):
-        raise ScreenResultsError(f"{verdicts_path} does not list exactly step 1's models after recycle 0; re-run the screen")
+    first = conf.screen.first_recycle
+    screened_rows = dv.recycle >= first
+    if sorted(keys) != sorted(zip(dv.condition[screened_rows], dv.model[screened_rows],
+                                  dv.seed[screened_rows], dv.recycle[screened_rows])):
+        raise ScreenResultsError(f"{verdicts_path} does not list exactly step 1's models at recycle {first} and "
+                                 f"above; re-run the screen")
     is_kept = v.kept.astype(str).str.lower() == "true"
-    return {"kept": {k for k, ok in zip(keys, is_kept) if ok}, "removed": int((~is_kept).sum()), "screened": len(v),
+    return {"kept": {k for k, ok in zip(keys, is_kept) if ok}, "first_recycle": int(first),
+            "removed": int((~is_kept).sum()), "screened": len(v),
             "reference": reference, "manifest_sha256": hashlib.sha256(raw).hexdigest()}
 
 
 def refit_kept(conf: Config, step1: dict, kept: set, log: Log, reference: dict | None = None) -> tuple:
     """dv rows and coordinates with the screen applied. Each condition × recycle group's kept models are
     labelled and fitted again on their own (label_group, as step 1 does), and step 1's own columns are
-    recomputed; a group with nothing removed keeps step 1's result, and recycle 0 is not screened. Without a
-    structure, the frame is the representative model the screen picked among the kept models (`reference`,
-    D-072); if it is not step 1's frame model, every group, recycle 0 included, is fitted onto it. Before
-    that, one group per condition is refitted from parse/ onto step 1's own frame and must give step 1's
-    result exactly. Returns (dv, X: rows × sites × 3)."""
+    recomputed; a group with nothing removed keeps step 1's result, and recycles below [screen]
+    first_recycle are not screened. Without a structure, the frame is the representative model the screen
+    picked among the kept models (`reference`, D-072); if it is not step 1's frame model, every group, the
+    unscreened recycles included, is fitted onto it. Before that, one group per condition is refitted from
+    parse/ onto step 1's own frame and must give step 1's result exactly. Returns (dv, X: rows × sites × 3)."""
     dv, sites, us = step1["dv"], step1["sites"], step1["us"]
     X1 = step1["coords"].astype(np.float64).reshape(len(dv), len(sites), 3)
     out = Path(conf.output_dir)
@@ -285,6 +290,7 @@ def refit_kept(conf: Config, step1: dict, kept: set, log: Log, reference: dict |
         L = label_group(raw(cname, keys), frame, fit_t, meas_t, compare)
         return L, L.coords.reshape(len(keys), -1, 3).astype(np.float32).astype(np.float64)
 
+    first_recycle = conf.screen.first_recycle if conf.screen is not None else 1
     keep_rows, new_X, verified = [], [], set()
     columns = {c: dv[c].to_numpy(dtype=object).copy() for c in ("mapping", "core_fit_rmsd", *REGION_DVS) if c in dv}
     for (cname, recycle), idx in dv.groupby(["condition", "recycle"], sort=False).indices.items():
@@ -296,7 +302,7 @@ def refit_kept(conf: Config, step1: dict, kept: set, log: Log, reference: dict |
                                         f"aligned/coords.npy: the parse cache does not belong to step 1's results; "
                                         f"re-run step 1")
             verified.add(cname)
-        if recycle == 0:                                                  # not screened (D-063 3h)
+        if recycle < first_recycle:                                       # below [screen] first_recycle: unjudged
             mine = idx
         else:
             mine = idx[[(dv.condition.iloc[i], dv.model.iloc[i], dv.seed.iloc[i], dv.recycle.iloc[i]) in kept
@@ -362,7 +368,7 @@ def _build(conf: Config, folder: Path, log: Log) -> dict:
     if conf.screen is not None:
         screen = read_screen(conf, step1)
         log(f"  the screen's results are up to date: {screen['removed']} of {screen['screened']} screened models "
-            f"removed (recycle 0 is not screened)")
+            f"removed (recycles below {screen['first_recycle']} are not screened)")
         dv, X = refit_kept(conf, step1, screen["kept"], log, screen["reference"])
     step1.pop("coords")
     meas_site = sites.in_measure.to_numpy(bool)                  # step 1's own columns, by network (D-070)

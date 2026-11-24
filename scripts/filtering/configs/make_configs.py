@@ -187,14 +187,16 @@ def write(dataset: str, out_dir: Path) -> Path:
              '[screen]',
              '# The checks that need no reference. own_place and filter_quarter are left off here:',
              '# they compare against the reference structure, and the chain we settled on judges',
-             '# topology reference-free. first_recycle = 1 because recycle 0 is not analysed.',
+             '# topology reference-free. first_recycle = 0: our convergence step can pick recycle 0',
+             '# as a trajectory\'s representative, so a screen that starts at 1 lets exactly those',
+             '# models through unjudged.',
              'domain_swapped = true',
              'wiring = true',
              'box_corners = true',
              's6_on_own_s5 = true',
              'own_place = false',
              'filter_quarter = false',
-             'first_recycle = 1']
+             'first_recycle = 0']
     if dataset in OMIT:
         body.append(f'omit = "{CHAIN}/{dataset}_omit.csv"')
     else:

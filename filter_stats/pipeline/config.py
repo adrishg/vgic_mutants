@@ -535,9 +535,13 @@ def load_config(path) -> Config:
                 raise ConfigError(f"[frame] {key} must be an integer, got {f[key]!r}")
         if "recycle" in f and not _is_int(f["recycle"]):
             raise ConfigError(f"[frame] recycle must be an integer, got {f['recycle']!r}")
-        if f.get("recycle") == 0 and "screen" in data:             # screen review 2, F3
-            raise ConfigError("[frame] recycle 0 is not screened, so with a [screen] and no structure it cannot be the "
-                              "representative model; name a later recycle (or leave recycle out for the last)")
+        if "screen" in data:                                       # screen review 2, F3
+            first = data["screen"].get("first_recycle", FIRST_RECYCLE_DEFAULT) if isinstance(data["screen"], dict) \
+                else FIRST_RECYCLE_DEFAULT
+            if _is_int(first) and _is_int(f.get("recycle")) and int(f["recycle"]) < int(first):
+                raise ConfigError(f"[frame] recycle {f['recycle']} is below [screen] first_recycle ({first}), so it is "
+                                  f"not screened and with a [screen] and no structure it cannot be the representative "
+                                  f"model; name a later recycle (or leave recycle out for the last)")
         frame = Frame(condition=fcond, model=f["model"], seed=f["seed"], recycle=f.get("recycle"))
 
     screen = _screen(data["screen"], base, conditions) if "screen" in data else None
